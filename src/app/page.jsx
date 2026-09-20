@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Quote, Loader2 } from "lucide-react";
+import { Quote } from "lucide-react";
+import Navbar from "../components/Navbar";
 
 const categories = [
   {
@@ -74,50 +75,13 @@ const testimonials = [
 
 export default function Home() {
   const router = useRouter();
-  const [latestPostId, setLatestPostId] = useState(null);
-  const [loadingLatest, setLoadingLatest] = useState(false);
 
-  // Finder state
+  // Search and quick finder state
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedExam, setSelectedExam] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
 
-  // 1. Fetch the single most recent post ID from WordPress for the "Latest PDFs" button
-  useEffect(() => {
-    async function getLatestPost() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL;
-      if (!wpUrl) return;
-
-      try {
-        const res = await fetch(`${wpUrl}/wp-json/wp/v2/posts?per_page=1&_fields=id`);
-        if (!res.ok) return;
-        const posts = await res.json();
-        if (Array.isArray(posts) && posts.length > 0) {
-          setLatestPostId(posts[0].id);
-        }
-      } catch (err) {
-        console.error("Error finding latest post:", err);
-      }
-    }
-
-    getLatestPost();
-  }, []);
-
-  // 2. Latest PDFs Click Handler
-  const handleLatestClick = () => {
-    if (latestPostId) {
-      router.push(`/read/${latestPostId}`);
-    } else {
-      // Fallback: navigate to exams or scroll down to categories
-      const catSection = document.getElementById("categories-section");
-      if (catSection) {
-        catSection.scrollIntoView({ behavior: "smooth" });
-      } else {
-        router.push("/category/exams");
-      }
-    }
-  };
-
-  // 3. Direct PDF Quick Finder Click Handler
+  // Direct PDF Quick Finder Click Handler
   const handleFinderSubmit = () => {
     if (selectedExam === "UPSC" || selectedExam === "BPSC") {
       router.push("/category/upsc");
@@ -130,79 +94,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col bg-[#E5E9EF] font-sans text-slate-900">
-      {/* ================= TOP HEADER & SEARCH ================= */}
-      <header className="w-full bg-[#E5E7EB]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 shadow-sm bg-white">
-              <Image
-                src="/images/logo.jpeg"
-                alt="Unique Geography Notes Logo"
-                fill
-                sizes="48px"
-                className="object-cover"
-                priority
-              />
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-2xl md:text-[26px] font-black tracking-tight text-[#111827]">
-                Unique Geography Notes
-              </h1>
-              <span className="text-[13px] font-medium text-slate-500">
-                Curated by University Faculty
-              </span>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            <div className="relative w-full md:w-80">
-              <input
-                type="text"
-                suppressHydrationWarning
-                placeholder="Search by topic, class or exam....."
-                className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-              />
-              <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400 stroke-[2.2]" />
-            </div>
-
-            {/* Functional Latest PDFs Button */}
-            <button 
-              onClick={handleLatestClick}
-              className="bg-[#E5A83B] hover:bg-[#d49425] text-[#1e1b18] font-bold text-xs px-5 py-2.5 rounded-md transition shadow-sm whitespace-nowrap cursor-pointer"
-            >
-              Latest PDFs
-            </button>
-          </div>
-        </div>
-
-        {/* ================= SUB-NAV ================= */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <div className="relative py-3 flex flex-col items-center">
-              <Link href="/" className="font-bold text-slate-950 px-1">
-                Home
-              </Link>
-              <span className="absolute bottom-0 left-1 right-1 h-[2.5px] bg-[#E5A83B] rounded-full" />
-            </div>
-
-            <Link href="/category/upsc" className="py-3 px-1 text-slate-800 hover:text-black transition whitespace-nowrap">
-              UPSC &amp; PSC
-            </Link>
-            <Link href="/category/school" className="py-3 px-1 text-slate-800 hover:text-black transition whitespace-nowrap">
-              School Notes
-            </Link>
-            <Link href="/category/exams" className="py-3 px-1 text-slate-800 hover:text-black transition whitespace-nowrap">
-              Exams (CTET, UGC-NET)
-            </Link>
-            <Link href="/category/university" className="py-3 px-1 text-slate-800 hover:text-black transition whitespace-nowrap">
-              University Notes
-            </Link>
-            <Link href="/category/gc" className="py-3 px-1 text-slate-800 hover:text-black transition whitespace-nowrap">
-              GC
-            </Link>
-          </div>
-        </nav>
-      </header>
+      {/* Universal Navbar containing Latest PDFs Modal */}
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       {/* ================= HERO SECTION ================= */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-10 md:py-14 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
@@ -218,7 +111,6 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap items-center gap-4">
-            {/* Functional Explore Exam Notes Button */}
             <Link 
               href="/category/exams"
               className="bg-[#E5A83B] hover:bg-[#d49425] text-[#1e1b18] font-bold text-[13px] px-6 py-3 rounded-lg shadow-sm transition inline-block text-center"
@@ -226,7 +118,6 @@ export default function Home() {
               Explore Exam Notes
             </Link>
 
-            {/* Functional Download Free NCERT PDFs Button */}
             <Link 
               href="/category/school/cbse"
               className="bg-[#474F59] hover:bg-[#343A42] text-white font-semibold text-[13px] px-6 py-3 rounded-lg shadow-sm transition inline-block text-center"

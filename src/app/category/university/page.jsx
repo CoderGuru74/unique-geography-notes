@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
 const DEGREE_TABS = [
@@ -219,25 +219,47 @@ export default function UniversityNotesPage() {
   }, [activeDegree]);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchAllWordPressData() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com";
+      const baseDomain = (
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+      ).replace(/\/+$/, "");
+
       setDataLoading(true);
 
       try {
-        const [pagesRes, postsRes] = await Promise.allSettled([
-          fetch(`${wpUrl}/wp-json/wp/v2/pages?per_page=100&_embed`),
-          fetch(
-            `${wpUrl}/wp-json/wp/v2/posts?_fields=id,date,title,excerpt,slug,acf,_links,_embed&_embed=wp:term&per_page=100`
-          ),
-        ]);
+        let pagesData = [];
+        let postsData = [];
 
-        const rawPages = pagesRes.status === "fulfilled" && pagesRes.value.ok ? await pagesRes.value.json() : [];
-        const rawPosts = postsRes.status === "fulfilled" && postsRes.value.ok ? await postsRes.value.json() : [];
+        // Fetch Pages Safely
+        try {
+          const pagesRes = await fetch(`${baseDomain}/wp-json/wp/v2/pages?per_page=100&_embed`);
+          if (pagesRes.ok) {
+            pagesData = await pagesRes.json();
+          }
+        } catch (e) {
+          console.warn("Could not fetch university pages:", e.message);
+        }
 
-        setAllPages(Array.isArray(rawPages) ? rawPages : []);
+        // Fetch Posts Safely
+        try {
+          const postsRes = await fetch(
+            `${baseDomain}/wp-json/wp/v2/posts?_fields=id,date,title,excerpt,slug,acf,_links,_embed&_embed=wp:term&per_page=100`
+          );
+          if (postsRes.ok) {
+            postsData = await postsRes.json();
+          }
+        } catch (e) {
+          console.warn("Could not fetch university posts:", e.message);
+        }
 
-        if (Array.isArray(rawPosts)) {
-          const formattedPosts = rawPosts.map((p) => {
+        if (!isMounted) return;
+
+        setAllPages(Array.isArray(pagesData) ? pagesData : []);
+
+        if (Array.isArray(postsData)) {
+          const formattedPosts = postsData.map((p) => {
             const title = p.title?.rendered || "";
             const excerpt = p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "";
             return {
@@ -245,26 +267,33 @@ export default function UniversityNotesPage() {
               title: title,
               excerpt: excerpt,
               slug: p.slug || "",
-              date: new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+              date: p.date
+                ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                : "",
               corpus: `${title} ${excerpt} ${p.slug || ""}`.toLowerCase(),
             };
           });
           setAllPosts(formattedPosts);
+        } else {
+          setAllPosts([]);
         }
       } catch (err) {
-        console.error("Error connecting to WordPress REST API:", err);
+        console.error("General error in fetchAllWordPressData:", err);
       } finally {
-        setDataLoading(false);
+        if (isMounted) setDataLoading(false);
       }
     }
 
     fetchAllWordPressData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const activeSemList = activeDegree === "ug" ? UG_SEMESTERS : PG_SEMESTERS;
   const currentSemConfig = activeSemList.find((s) => s.id === activeSemester) || activeSemList[0];
 
-  // Helper to sanitize WordPress HTML and rewrite all external links to Next.js routes
   function cleanAndRewriteWordPressLinks(html) {
     if (!html) return "";
 
@@ -352,7 +381,6 @@ export default function UniversityNotesPage() {
     });
   }, [allPosts, currentSemConfig, searchQuery]);
 
-  // Global click interception: Catches ANY link clicked inside the syllabus content
   const handleContentClick = (e) => {
     const targetLink = e.target.closest("a");
     if (!targetLink) return;
@@ -393,48 +421,8 @@ export default function UniversityNotesPage() {
         contentElementId="printable-content"
       />
 
-      {/* Top Header */}
-      <header className="w-full bg-[#E5E7EB]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 bg-white shadow-xs">
-              <Image src="/images/logo.jpeg" alt="Logo" fill sizes="48px" className="object-cover" priority />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-[26px] font-black tracking-tight text-[#111827]">
-                Unique Geography Notes
-              </h1>
-              <span className="text-[13px] font-medium text-slate-500">Curated by University Faculty</span>
-            </div>
-          </Link>
-
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              placeholder="Search topic, paper or notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-            />
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-          </div>
-        </div>
-
-        {/* Global Navigation Bar */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <Link href="/" className="py-3 px-1 hover:text-black whitespace-nowrap">Home</Link>
-            <Link href="/category/upsc" className="py-3 px-1 hover:text-black whitespace-nowrap">UPSC &amp; PSC</Link>
-            <Link href="/category/school" className="py-3 px-1 hover:text-black whitespace-nowrap">School Notes</Link>
-            <Link href="/category/exams" className="py-3 px-1 hover:text-black whitespace-nowrap">Exams (CTET, UGC-NET)</Link>
-            <div className="relative py-3 flex flex-col items-center">
-              <Link href="/category/university" className="font-bold text-slate-950 px-1 whitespace-nowrap">University Notes</Link>
-              <span className="absolute bottom-0 left-1 right-1 h-[2.5px] bg-[#E5A83B] rounded-full" />
-            </div>
-            <Link href="/category/gc" className="py-3 px-1 hover:text-black whitespace-nowrap">GC</Link>
-          </div>
-        </nav>
-      </header>
+      {/* Global Navbar with functional Latest PDFs modal */}
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       {/* Select Degree Level */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
@@ -456,7 +444,7 @@ export default function UniversityNotesPage() {
         </div>
       </section>
 
-      {/* Horizontal Strip for All Semesters */}
+      {/* Semester Horizontal Strip */}
       <section className="border-b border-gray-300 bg-[#DFE2E8]">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3 sm:gap-6 overflow-x-auto text-[13px] font-semibold text-slate-700">
           {activeSemList.map((sem) => (
@@ -477,8 +465,7 @@ export default function UniversityNotesPage() {
 
       {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-
-        {/* 1. Live Syllabus Display Section */}
+        {/* 1. Live Syllabus Outline Section */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
             <div>
@@ -514,6 +501,7 @@ export default function UniversityNotesPage() {
             </div>
           ) : (
             <div
+              id="printable-content"
               onClick={handleContentClick}
               className="prose max-w-none text-slate-800 leading-relaxed
                 [&_a]:text-blue-600 [&_a]:font-semibold [&_a:hover]:underline [&_a]:cursor-pointer
@@ -527,7 +515,7 @@ export default function UniversityNotesPage() {
           )}
         </div>
 
-        {/* 2. Downloadable Notes List at Bottom */}
+        {/* 2. Downloadable Notes List */}
         <section className="w-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
@@ -597,7 +585,6 @@ export default function UniversityNotesPage() {
             </div>
           )}
         </section>
-
       </div>
     </main>
   );
