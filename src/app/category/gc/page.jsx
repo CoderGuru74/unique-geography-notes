@@ -1,465 +1,469 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { Search, Download, BookOpen, FileText, Eye, Lock, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
-// Fixed Sub-Topics from Legacy Website Menu
-const GC_SUB_TOPICS = [
-  { id: "all", label: "सभी विषय (All Topics)" },
-  { id: "india-geo", label: "1. भारत का भूगोल" },
-  { id: "gen-geo", label: "General Geography" },
-  { id: "gen-studies", label: "3. सामान्य अध्ययन" },
+// Exactly matching the 3 original sections from the old website
+const GC_SECTIONS = [
+  {
+    id: "bharat-bhugol",
+    label: "1. भारत का भूगोल",
+    enLabel: "Geography of India",
+    slugPatterns: [
+      "bharat-ka-bhugol",
+      "geography-of-india",
+      "indian-geography",
+      "bharat-bhugol",
+      "bharat"
+    ],
+    keywords: ["भारत का भूगोल", "भारतीय भूगोल", "geography of india", "indian geography"],
+  },
+  {
+    id: "general-geography",
+    label: "General Geography",
+    enLabel: "General Geography",
+    slugPatterns: [
+      "general-geography",
+      "samanya-bhugol",
+      "basic-geography",
+      "physical-geography"
+    ],
+    keywords: ["general geography", "सामान्य भूगोल", "भौतिक भूगोल"],
+  },
+  {
+    id: "samanya-adhyayan",
+    label: "3. सामान्य अध्ययन",
+    enLabel: "General Studies (GS)",
+    slugPatterns: [
+      "samanya-adhyayan",
+      "general-studies",
+      "gs-notes",
+      "gk-gs",
+      "general-competition"
+    ],
+    keywords: ["सामान्य अध्ययन", "general studies", "gk", "gs"],
+  },
 ];
 
-// Target Exam Filter Pills
-const EXAM_PILLS = [
-  { id: "all", label: "All Exams", keys: [] },
-  { id: "ssc", label: "SSC CGL / CHSL", keys: ["ssc", "cgl", "chsl"] },
-  { id: "rrb", label: "Railway RRB NTPC", keys: ["rrb", "railway", "ntpc", "group d"] },
-  { id: "banking", label: "Banking GS", keys: ["banking", "bank", "ibps", "sbi", "po"] },
-  { id: "daroga", label: "Bihar Daroga / Police", keys: ["daroga", "police", "bihar", "bssc", "si"] },
-  { id: "state", label: "State Exams", keys: ["state", "psc", "bpsc", "uppsc", "mppsc", "ras"] },
+// Noise and draft filter to prevent test posts from polluting production
+const JUNK_DRAFT_PATTERNS = [
+  "ctet child pedo",
+  "plate tectonics (test)",
+  "ewfewafwaefweee",
+  "ppu pg semester",
+  "ppu ug semester",
+  "mjc-",
+  "mic-",
+  "ug regular semester",
+  "pg regular semester",
 ];
 
-export default function GeneralCompetitionPage() {
-  const [activeTopic, setActiveTopic] = useState("all");
-  const [activePill, setActivePill] = useState("all");
+export default function GCPage() {
+  const router = useRouter();
+
+  const [activeSection, setActiveSection] = useState("bharat-bhugol");
   const [searchQuery, setSearchQuery] = useState("");
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const [allPages, setAllPages] = useState([]);
+  const [allPosts, setAllPosts] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  const [selectedPageIndex, setSelectedPageIndex] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState("Download PDF");
+  const [modalAction, setModalAction] = useState("Download GC Notes PDF");
+  const [activePostId, setActivePostId] = useState(null);
 
-  const openAuthPaywall = (actionName) => {
-    setModalAction(actionName);
+  const openDownloadModal = (title, postId) => {
+    setModalAction(title);
+    setActivePostId(postId);
     setModalOpen(true);
   };
 
   useEffect(() => {
-    async function loadAllGCContent() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL;
-      if (!wpUrl) {
-        setLoading(false);
-        return;
-      }
+    let isMounted = true;
 
-      setLoading(true);
+    async function fetchGCWordPressData() {
+      const baseDomain = (
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+      ).replace(/\/+$/, "");
+
+      setDataLoading(true);
+
       try {
-        // Fetch pages sequentially to get all posts
-        const page1Res = await fetch(`${wpUrl}/wp-json/wp/v2/posts?_embed&per_page=100&page=1`);
-        const page1 = page1Res.ok ? await page1Res.json() : [];
+        let pagesData = [];
+        let postsData = [];
 
-        let allPosts = [...page1];
-
-        // Fetch page 2 if more posts exist
-        if (page1.length === 100) {
-          try {
-            const page2Res = await fetch(`${wpUrl}/wp-json/wp/v2/posts?_embed&per_page=100&page=2`);
-            if (page2Res.ok) {
-              const page2 = await page2Res.json();
-              if (Array.isArray(page2)) allPosts = [...allPosts, ...page2];
-            }
-          } catch (e) {
-            // Reached last page
+        // 1. Safe Pages Fetch
+        try {
+          const pagesRes = await fetch(`${baseDomain}/wp-json/wp/v2/pages?per_page=100&_embed`);
+          if (pagesRes.ok) {
+            pagesData = await pagesRes.json();
           }
+        } catch (e) {
+          console.warn("Could not fetch GC pages from WordPress:", e.message);
         }
 
-        if (Array.isArray(allPosts)) {
-          const formatted = allPosts.map((p, index) => {
-            const title = p.title?.rendered || "";
-            const titleLower = title.toLowerCase();
+        // 2. Safe Posts Fetch
+        try {
+          const postsRes = await fetch(
+            `${baseDomain}/wp-json/wp/v2/posts?_fields=id,date,title,excerpt,content,slug,acf,_links,_embed&_embed=wp:term&per_page=100`
+          );
+          if (postsRes.ok) {
+            postsData = await postsRes.json();
+          }
+        } catch (e) {
+          console.warn("Could not fetch GC posts from WordPress:", e.message);
+        }
 
-            // Extract WP Category Names and Slugs
-            const wpTerms = p._embedded?.["wp:term"] || [];
-            const termNames = [];
-            if (Array.isArray(wpTerms)) {
-              wpTerms.forEach((group) => {
-                if (Array.isArray(group)) {
-                  group.forEach((t) => {
-                    if (t?.name) termNames.push(t.name.toLowerCase());
-                    if (t?.slug) termNames.push(t.slug.toLowerCase());
-                  });
-                }
-              });
-            }
+        if (!isMounted) return;
 
-            const rawContent = (p.content?.rendered || "").replace(/<[^>]+>/g, "").toLowerCase();
-            const metaCorpus = [
-              titleLower,
-              ...termNames,
-              (p.acf?.paper_type || "").toLowerCase(),
-              (p.acf?.sub_topic || "").toLowerCase(),
-              rawContent.slice(0, 500),
-            ].join(" ");
+        setAllPages(Array.isArray(pagesData) ? pagesData : []);
 
-            const dateObj = new Date(p.date);
-            const dateStr = dateObj.toLocaleDateString("en-US", {
-              month: "short",
-              year: "numeric",
+        if (Array.isArray(postsData)) {
+          const formattedPosts = postsData
+            .filter((p) => {
+              const rawTitle = (p.title?.rendered || "").toLowerCase();
+              const rawSlug = (p.slug || "").toLowerCase();
+              const fullCheck = `${rawTitle} ${rawSlug}`;
+              
+              // Filter out drafts or university question papers
+              const isJunk = JUNK_DRAFT_PATTERNS.some((junk) => fullCheck.includes(junk));
+              return !isJunk;
+            })
+            .map((p) => {
+              const title = p.title?.rendered || "";
+              const excerpt = p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "";
+              return {
+                id: p.id,
+                title: title,
+                excerpt: excerpt,
+                content: p.content?.rendered || "",
+                slug: p.slug || "",
+                date: p.date
+                  ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+                  : "",
+                corpus: `${title} ${excerpt} ${p.slug || ""}`.toLowerCase(),
+              };
             });
 
-            return {
-              id: p.id,
-              index: String(index + 1).padStart(2, "0"),
-              title: title,
-              badge: p.acf?.paper_type || (termNames.length > 0 ? termNames[0] : "General Studies"),
-              chapters: p.acf?.chapters ? `${p.acf.chapters} Chapters` : "Comprehensive",
-              pages: p.acf?.pages ? `${p.acf.pages} Pages` : "PDF Notes",
-              size: p.acf?.file_size || "3.5 MB",
-              date: dateStr,
-              metaText: metaCorpus,
-              desc: p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "",
-            };
-          });
-
-          setItems(formatted);
+          setAllPosts(formattedPosts);
+        } else {
+          setAllPosts([]);
         }
       } catch (err) {
-        console.error("Error loading GC notes:", err);
-        setItems([]);
+        console.error("General error loading GC data:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setDataLoading(false);
       }
     }
 
-    loadAllGCContent();
+    fetchGCWordPressData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Filter Engine
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const q = searchQuery.trim().toLowerCase();
-      const text = item.metaText || "";
+  const currentSectionConfig =
+    GC_SECTIONS.find((s) => s.id === activeSection) || GC_SECTIONS[0];
 
-      // 1. Search Query
-      const matchesSearch = q === "" || text.includes(q);
+  useEffect(() => {
+    setSelectedPageIndex(0);
+  }, [activeSection]);
 
-      // 2. Sub-Topic Strip (1. भारत का भूगोल, General Geography, 3. सामान्य अध्ययन)
-      let matchesTopic = true;
-      if (activeTopic === "india-geo") {
-        matchesTopic =
-          text.includes("भारत") ||
-          text.includes("india") ||
-          text.includes("bihar") ||
-          text.includes("बिहार") ||
-          text.includes("नदी") ||
-          text.includes("river") ||
-          text.includes("soil") ||
-          text.includes("मृदा") ||
-          text.includes("agriculture") ||
-          text.includes("कृषि") ||
-          text.includes("उद्योग") ||
-          text.includes("खनिज") ||
-          text.includes("mineral");
-      } else if (activeTopic === "gen-geo") {
-        matchesTopic =
-          text.includes("general geography") ||
-          text.includes("सामान्य भूगोल") ||
-          text.includes("geography") ||
-          text.includes("भूगोल") ||
-          text.includes("earth") ||
-          text.includes("climate") ||
-          text.includes("जलवायु") ||
-          text.includes("map") ||
-          text.includes("scale") ||
-          text.includes("मापक") ||
-          text.includes("ocean") ||
-          text.includes("समुद्र") ||
-          text.includes("weather") ||
-          text.includes("आंतरिक संरचना");
-      } else if (activeTopic === "gen-studies") {
-        matchesTopic =
-          text.includes("सामान्य अध्ययन") ||
-          text.includes("general studies") ||
-          text.includes("general competition") ||
-          text.includes("history") ||
-          text.includes("इतिहास") ||
-          text.includes("polity") ||
-          text.includes("संविधान") ||
-          text.includes("science") ||
-          text.includes("ict") ||
-          text.includes("computer") ||
-          text.includes("research") ||
-          text.includes("teaching");
-      }
+  function cleanAndRewriteWordPressLinks(html) {
+    if (!html) return "";
 
-      // 3. Exam Pills (SSC, Railway, Banking, Police, State)
-      let matchesPill = true;
-      if (activePill !== "all") {
-        const pillObj = EXAM_PILLS.find((p) => p.id === activePill);
-        if (pillObj && pillObj.keys.length > 0) {
-          matchesPill = pillObj.keys.some((k) => text.includes(k.toLowerCase()));
+    return html.replace(
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+      (match, domain, path) => {
+        let cleanPath = path.replace(/^\/+|\/+$/g, "");
+        try {
+          cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
+        } catch (_) {
+          try {
+            cleanPath = decodeURIComponent(cleanPath);
+          } catch (_) {}
         }
-      }
 
-      return matchesSearch && matchesTopic && matchesPill;
+        if (cleanPath.startsWith("category/")) {
+          return `href="/${cleanPath}"`;
+        }
+        return `href="/read/${encodeURIComponent(cleanPath)}"`;
+      }
+    );
+  }
+
+  // Find all WordPress Pages corresponding to the selected section
+  const sectionPages = useMemo(() => {
+    if (!allPages || allPages.length === 0) return [];
+
+    return allPages
+      .filter((pg) => {
+        const slug = (pg.slug || "").toLowerCase();
+        const title = (pg.title?.rendered || "").toLowerCase();
+        const fullText = `${slug} ${title}`;
+
+        const matchesPattern = currentSectionConfig.slugPatterns.some((pattern) =>
+          fullText.includes(pattern.toLowerCase())
+        );
+
+        const matchesKeyword = currentSectionConfig.keywords.some((kw) =>
+          fullText.includes(kw.toLowerCase())
+        );
+
+        return matchesPattern || matchesKeyword;
+      })
+      .map((pg) => ({
+        id: pg.id,
+        title: pg.title?.rendered || currentSectionConfig.label,
+        slug: pg.slug || "",
+        content: cleanAndRewriteWordPressLinks(pg.content?.rendered || ""),
+      }));
+  }, [allPages, currentSectionConfig]);
+
+  const activePage = sectionPages[selectedPageIndex] || sectionPages[0] || null;
+
+  // Filter posts relevant to this section
+  const filteredPosts = useMemo(() => {
+    if (!allPosts || allPosts.length === 0) return [];
+
+    return allPosts.filter((p) => {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesSearch = q === "" || p.corpus.includes(q);
+
+      const matchesKeyword = currentSectionConfig.keywords.some((kw) =>
+        p.corpus.includes(kw.toLowerCase())
+      );
+      const matchesPattern = currentSectionConfig.slugPatterns.some((pattern) =>
+        p.corpus.includes(pattern.toLowerCase())
+      );
+
+      return matchesSearch && (matchesKeyword || matchesPattern);
     });
-  }, [items, searchQuery, activeTopic, activePill]);
+  }, [allPosts, currentSectionConfig, searchQuery]);
+
+  const handleContentClick = (e) => {
+    const targetLink = e.target.closest("a");
+    if (!targetLink) return;
+
+    const href = targetLink.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+
+    e.preventDefault();
+
+    let cleanPath = href
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^\/?read\//i, "")
+      .replace(/^\/+|\/+$/g, "");
+
+    try {
+      cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
+    } catch (_) {
+      try {
+        cleanPath = decodeURIComponent(cleanPath);
+      } catch (_) {}
+    }
+
+    if (cleanPath.startsWith("category/")) {
+      router.push(`/${cleanPath}`);
+      return;
+    }
+
+    router.push(`/read/${encodeURIComponent(cleanPath)}`);
+  };
 
   return (
     <main className="min-h-screen flex flex-col bg-[#E5E9EF] font-sans text-slate-900">
-      <AuthModal isOpen={modalOpen} onClose={() => setModalOpen(false)} targetAction={modalAction} />
+      <AuthModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        targetAction={modalAction}
+        postId={activePostId}
+        contentElementId="printable-content"
+      />
 
-      {/* Header */}
-      <header className="w-full bg-[#E5E7EB]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 bg-white">
-              <Image src="/images/logo.jpeg" alt="Logo" fill sizes="48px" className="object-cover" priority />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-[26px] font-black tracking-tight text-[#111827]">
-                Unique Geography Notes
-              </h1>
-              <span className="text-[13px] font-medium text-slate-500">Curated by University Faculty</span>
-            </div>
-          </Link>
+      {/* Global Navbar */}
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              placeholder="Search notes, topics, exams..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-            />
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+      {/* Sub-header Banner */}
+      <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Category:</span>
+            <span className="text-xs font-bold text-slate-900 bg-white/80 px-3 py-1 rounded-lg border border-gray-300 shadow-xs">
+              General Competition (SSC, Railway, Banking, BPSC, Police &amp; All One-Day Exams)
+            </span>
           </div>
-        </div>
-
-        {/* Global Nav */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <Link href="/" className="py-3 px-1 hover:text-black">Home</Link>
-            <Link href="/category/upsc" className="py-3 px-1 hover:text-black">UPSC &amp; PSC</Link>
-            <Link href="/category/school" className="py-3 px-1 hover:text-black">School Notes</Link>
-            <Link href="/category/exams" className="py-3 px-1 hover:text-black">Exams (CTET, UGC-NET)</Link>
-            <Link href="/category/university" className="py-3 px-1 hover:text-black">University Notes</Link>
-            <div className="relative py-3 flex flex-col items-center">
-              <Link href="/category/gc" className="font-bold text-slate-950 px-1">GC</Link>
-              <span className="absolute bottom-0 left-1 right-1 h-[2.5px] bg-[#E5A83B] rounded-full" />
-            </div>
-          </div>
-        </nav>
-      </header>
-
-      {/* Hero Banner with Exam Pills */}
-      <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-6 w-full">
-        <div className="text-xs font-semibold text-slate-500 mb-3 flex items-center gap-1.5">
-          <Link href="/" className="hover:underline">Home</Link>
-          <span>›</span>
-          <span className="text-[#E5A83B]">Samanaya Pratiyogita</span>
-        </div>
-
-        <div className="bg-[#EFE5D5] rounded-3xl p-6 sm:p-10 border border-amber-200/70 shadow-sm mb-6">
-          <span className="text-xs font-bold text-[#B45309] uppercase tracking-wider block mb-1">
-            General Studies &amp; Geography One–Liners
+          <span className="text-xs font-semibold text-slate-600 bg-white/50 px-3 py-1 rounded-full border border-gray-300 hidden sm:inline">
+            Fast Track Revision &amp; Static GS
           </span>
-          <h2 className="text-3xl sm:text-4xl md:text-[38px] font-extrabold text-[#111827] leading-[1.2] tracking-tight mb-2">
-            Samanaya Pratiyogita (सामान्य प्रतियोगिता)
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600 font-normal leading-relaxed max-w-3xl mb-6">
-            High-quality PDF notes tailored for SSC, RRB, Banking, Bihar Daroga, Police and all State Competitive Exams.
-          </p>
-
-          {/* Exam Pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            {EXAM_PILLS.map((pill) => (
-              <button
-                key={pill.id}
-                onClick={() => setActivePill(pill.id)}
-                className={`text-xs px-4 py-2.5 rounded-xl font-bold transition shadow-sm cursor-pointer ${
-                  activePill === pill.id
-                    ? "bg-[#0B2545] text-white shadow"
-                    : "bg-white text-slate-700 hover:bg-slate-100 border border-gray-300"
-                }`}
-              >
-                {pill.label}
-              </button>
-            ))}
-          </div>
         </div>
       </section>
 
-      {/* 3 Categories from the Legacy Menu */}
-      <section className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[13px] font-semibold text-slate-700">
-          {GC_SUB_TOPICS.map((topic) => (
+      {/* The 3 Section Buttons from the Old Website */}
+      <section className="border-b border-gray-300 bg-[#DFE2E8]">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3 overflow-x-auto text-[13px] font-semibold text-slate-700 py-2">
+          {GC_SECTIONS.map((section) => (
             <button
-              key={topic.id}
-              onClick={() => setActiveTopic(topic.id)}
-              className={`py-3.5 px-1 whitespace-nowrap transition cursor-pointer ${
-                activeTopic === topic.id
-                  ? "border-b-2 border-[#E5A83B] text-slate-950 font-bold"
-                  : "hover:text-black"
+              key={section.id}
+              onClick={() => setActiveSection(section.id)}
+              className={`py-2.5 px-5 rounded-xl whitespace-nowrap transition cursor-pointer font-bold ${
+                activeSection === section.id
+                  ? "bg-[#0B2545] text-white shadow-xs"
+                  : "bg-white/70 text-slate-800 hover:bg-white hover:text-black border border-gray-300/80"
               }`}
             >
-              {topic.label}
+              {section.label}
             </button>
           ))}
         </div>
       </section>
 
-      {/* Grid of Notes */}
-      <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-          <div>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Quick Revision PDF Grid
-            </h3>
-            <p className="text-xs text-slate-500 font-medium">
-              Showing {filteredItems.length} topic PDFs available
-            </p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="bg-white rounded-3xl p-16 flex flex-col items-center justify-center text-slate-500 border border-gray-200">
-            <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B] mb-3" />
-            <p className="text-xs font-semibold">Loading all notes from backend...</p>
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="bg-white/80 rounded-3xl p-14 text-center text-slate-500 border border-gray-200">
-            <BookOpen className="w-12 h-12 text-amber-500/50 mb-3 mx-auto" />
-            <h4 className="font-bold text-base text-slate-800 mb-1">No Notes Found</h4>
-            <p className="text-xs text-slate-500 max-w-md mb-4 mx-auto">
-              No notes matched your selected filter combination.
-            </p>
-            <button
-              onClick={() => {
-                setActiveTopic("all");
-                setActivePill("all");
-                setSearchQuery("");
-              }}
-              className="px-4 py-2 bg-[#0B2545] text-white text-xs font-bold rounded-xl cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-gray-200/80 flex flex-col justify-between hover:shadow-md transition"
-              >
-                <div>
-                  <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[11px] font-extrabold px-3 py-1 rounded-md mb-4 border border-amber-200">
-                    {item.badge}
-                  </span>
-
-                  <h4
-                    className="font-extrabold text-base sm:text-lg text-slate-900 leading-snug mb-3 line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
-                  />
-
-                  {item.desc && (
-                    <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
-                      {item.desc}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium mb-6">
-                    <span className="flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                      {item.chapters}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-slate-400" />
-                      {item.pages}
-                    </span>
-                    <span className="flex items-center gap-1.5">📦 {item.size}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
-                  <Link
-                    href={`/read/${item.id}`}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Read Free
-                  </Link>
-
-                  <button
-                    onClick={() => openAuthPaywall(`Download ${item.title}`)}
-                    className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </button>
-                </div>
-              </div>
+      {/* Main Content Area */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
+        {/* If multiple WordPress pages exist under this section, show page tabs */}
+        {sectionPages.length > 1 && (
+          <div className="flex items-center gap-2 overflow-x-auto mb-4 pb-2">
+            <span className="text-xs font-black text-slate-600 uppercase tracking-wider whitespace-nowrap">
+              पेज चुनें:
+            </span>
+            {sectionPages.map((pg, idx) => (
+              <button
+                key={pg.id}
+                onClick={() => setSelectedPageIndex(idx)}
+                className={`text-xs px-3.5 py-1.5 rounded-lg font-bold border transition cursor-pointer whitespace-nowrap ${
+                  selectedPageIndex === idx
+                    ? "bg-[#E5A83B] text-slate-950 border-amber-400 shadow-xs"
+                    : "bg-white text-slate-700 border-gray-300 hover:bg-slate-50"
+                }`}
+                dangerouslySetInnerHTML={{ __html: pg.title }}
+              />
             ))}
           </div>
         )}
 
-        {/* One–Liner Quick Download Table */}
-        {filteredItems.length > 0 && (
-          <section className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-200 mb-16">
-            <div className="mb-6">
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-1">
-                One–Liner Quick Download Table
-              </h3>
-              <p className="text-xs text-slate-500">
-                Read summary on-site or unlock one-click PDF downloads.
-              </p>
+        {/* 1. Live WordPress Page Content (Only shows when client has published a page for it) */}
+        {activePage && (
+          <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
+              <div>
+                <span className="text-[11px] font-extrabold text-[#B45309] uppercase tracking-wider block">
+                  General Competition • {currentSectionConfig.enLabel}
+                </span>
+                <h2
+                  className="text-xl sm:text-2xl font-black text-slate-900"
+                  dangerouslySetInnerHTML={{
+                    __html: activePage.title,
+                  }}
+                />
+              </div>
+              <button
+                onClick={() =>
+                  openDownloadModal(
+                    activePage.title || `${currentSectionConfig.label} Notes`,
+                    activePage.id
+                  )
+                }
+                className="bg-[#0B2545] hover:bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                <Download className="w-4 h-4 text-amber-400" /> Save Page PDF
+              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="py-3 px-4">#</th>
-                    <th className="py-3 px-4">Topic / PDF Title</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Pages</th>
-                    <th className="py-3 px-4">Size</th>
-                    <th className="py-3 px-4">Updated</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-medium">
-                  {filteredItems.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3.5 px-4 font-bold text-slate-400">{row.index}</td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900 max-w-sm">
-                        <span dangerouslySetInnerHTML={{ __html: row.title }} />
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="bg-amber-50 text-amber-800 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-200">
-                          {row.badge}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-600">{row.pages}</td>
-                      <td className="py-3.5 px-4 text-slate-600">{row.size}</td>
-                      <td className="py-3.5 px-4 text-slate-400 text-[11px]">{row.date}</td>
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Link
-                            href={`/read/${row.id}`}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold px-3 py-1.5 rounded-lg text-[11px] transition flex items-center gap-1"
-                          >
-                            <Eye className="w-3 h-3" /> Read
-                          </Link>
-                          <button
-                            onClick={() => openAuthPaywall(`Download ${row.title}`)}
-                            className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold px-3 py-1.5 rounded-lg text-[11px] transition shadow-xs flex items-center gap-1 cursor-pointer"
-                          >
-                            <Download className="w-3 h-3" /> Download
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+            <div
+              id="printable-content"
+              onClick={handleContentClick}
+              className="prose max-w-none text-slate-800 leading-relaxed
+                [&_a]:text-blue-600 [&_a]:font-semibold [&_a:hover]:underline [&_a]:cursor-pointer
+                [&_h1]:text-xl [&_h1]:font-black [&_h1]:text-slate-900 [&_h1]:mb-3
+                [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:text-slate-900 [&_h2]:mt-5 [&_h2]:mb-2
+                [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-[#DC2626] [&_h3]:mt-4 [&_h3]:mb-1.5
+                [&_ul]:list-square [&_ul]:pl-6 [&_ul]:my-2 [&_li]:my-1.5 [&_li]:text-xs sm:[&_li]:text-sm
+                [&_img]:rounded-xl [&_img]:shadow-xs [&_img]:my-3 [&_img]:mx-auto"
+              dangerouslySetInnerHTML={{ __html: activePage.content }}
+            />
+          </div>
         )}
-      </section>
+
+        {/* 2. Downloadable Notes List for the Selected Section */}
+        <section className="w-full">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
+            <div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {currentSectionConfig.label} — उपलब्ध नोट्स एवं PDFs
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {filteredPosts.length} study units and PDFs ready for download.
+              </p>
+            </div>
+          </div>
+
+          {dataLoading ? (
+            <div className="bg-white rounded-3xl p-14 flex flex-col items-center justify-center text-slate-500 border border-gray-200">
+              <Loader2 className="w-6 h-6 animate-spin text-[#E5A83B] mb-2" />
+              <p className="text-xs font-semibold">Loading materials from server...</p>
+            </div>
+          ) : filteredPosts.length === 0 && !activePage ? (
+            <div className="bg-white/80 rounded-3xl p-12 text-center text-slate-500 border border-gray-200">
+              <FileText className="w-10 h-10 text-amber-500/50 mb-2 mx-auto" />
+              <h4 className="font-bold text-sm text-slate-800">
+                इस सेक्शन के पेजेस और नोट्स WordPress पर अपलोड किए जा रहे हैं।
+              </h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                You can create and publish new Pages or Posts under this topic in WordPress Admin anytime.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredPosts.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
+                >
+                  <div>
+                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
+                      {currentSectionConfig.label}
+                    </span>
+
+                    <h4
+                      className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
+                      dangerouslySetInnerHTML={{ __html: item.title }}
+                    />
+
+                    {item.excerpt && (
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                        {item.excerpt}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                    <Link
+                      href={`/read/${item.id}`}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Read
+                    </Link>
+
+                    <button
+                      onClick={() => openDownloadModal(item.title, item.id)}
+                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download PDF
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
