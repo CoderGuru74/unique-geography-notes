@@ -15,6 +15,7 @@ import {
   Eye,
   Loader2
 } from "lucide-react";
+import Navbar from "../../../../components/Navbar";
 import AuthModal from "../../../../components/AuthModal";
 
 const LOWER_SECONDARY = [
@@ -97,11 +98,13 @@ export default function BSEBPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState("Download PDF");
+  const [activePostId, setActivePostId] = useState(null);
 
   const notesSectionRef = useRef(null);
 
-  const openAuthPaywall = (actionName) => {
+  const openAuthPaywall = (actionName, postId = null) => {
     setModalAction(actionName);
+    setActivePostId(postId);
     setModalOpen(true);
   };
 
@@ -126,11 +129,10 @@ export default function BSEBPage() {
     }
   };
 
-  // 1. Fetch categories to discover exact WordPress Category IDs for BSEB Classes
+  // 1. Fetch categories to discover exact WordPress Category IDs for BSEB
   useEffect(() => {
     async function loadCategories() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL;
-      if (!wpUrl) return;
+      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com").replace(/\/+$/, "");
 
       try {
         const res = await fetch(`${wpUrl}/wp-json/wp/v2/categories?per_page=100&hide_empty=false`);
@@ -146,14 +148,10 @@ export default function BSEBPage() {
     loadCategories();
   }, []);
 
-  // 2. Query posts targeted to BSEB and active class
+  // 2. Query posts targeted strictly to BSEB
   useEffect(() => {
     async function fetchBSEBContent() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL;
-      if (!wpUrl) {
-        setLoading(false);
-        return;
-      }
+      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com").replace(/\/+$/, "");
 
       setLoading(true);
       try {
@@ -174,7 +172,8 @@ export default function BSEBPage() {
               s.includes(`class${activeClassFilter}`) ||
               n.includes(`class ${activeClassFilter}`) ||
               n.includes(`वर्ग-${activeClassFilter}`) ||
-              n.includes(`वर्ग ${activeClassFilter}`);
+              n.includes(`वर्ग ${activeClassFilter}`) ||
+              n.includes(`${activeClassFilter}वीं`);
 
             if (matchesClass) {
               matchedCategoryIds.push(c.id);
@@ -187,23 +186,33 @@ export default function BSEBPage() {
         if (matchedCategoryIds.length > 0) {
           url += `&categories=${matchedCategoryIds.join(",")}`;
         } else if (activeClassFilter !== "all") {
-          url += `&search=${encodeURIComponent(`BSEB class ${activeClassFilter}`)}`;
+          url += `&search=${encodeURIComponent(`बिहार बोर्ड class ${activeClassFilter}`)}`;
         }
 
         const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to load posts");
-        const rawPosts = await res.json();
+        let rawPosts = res.ok ? await res.json() : [];
+
+        // Fallback search if zero category matches found
+        if ((!Array.isArray(rawPosts) || rawPosts.length === 0) && activeClassFilter !== "all") {
+          const fallbackRes = await fetch(
+            `${wpUrl}/wp-json/wp/v2/posts?search=${encodeURIComponent(`BSEB ${activeClassFilter}`)}&per_page=100&_embed`
+          );
+          if (fallbackRes.ok) {
+            rawPosts = await fallbackRes.json();
+          }
+        }
 
         if (Array.isArray(rawPosts)) {
           const formatted = rawPosts.map((p) => {
             const title = p.title?.rendered || "";
             const titleLower = title.toLowerCase();
 
-            // Detect Class number
+            // Detect Class Number
             let classNum = activeClassFilter !== "all" ? activeClassFilter : "";
             if (!classNum) {
               const match = titleLower.match(/class\s*[-–]?\s*(6|7|8|9|10|11|12)/i) ||
-                            titleLower.match(/वर्ग\s*[-–]?\s*(6|7|8|9|10|11|12)/i);
+                            titleLower.match(/वर्ग\s*[-–]?\s*(6|7|8|9|10|11|12)/i) ||
+                            titleLower.match(/(6|7|8|9|10|11|12)वीं/i);
               if (match) classNum = match[1];
             }
 
@@ -216,6 +225,7 @@ export default function BSEBPage() {
 
             return {
               id: p.id,
+              slug: p.slug || String(p.id),
               title: title,
               classNum: classNum,
               subject: subject,
@@ -242,7 +252,7 @@ export default function BSEBPage() {
     fetchBSEBContent();
   }, [activeClassFilter, categories]);
 
-  // Filtered Cards for display
+  // Filtered display items
   const displayedPosts = useMemo(() => {
     return posts.filter((item) => {
       const q = searchQuery.trim().toLowerCase();
@@ -262,82 +272,18 @@ export default function BSEBPage() {
 
   return (
     <main className="min-h-screen flex flex-col bg-[#E5E9EF] font-sans text-slate-900">
-      <AuthModal isOpen={modalOpen} onClose={() => setModalOpen(false)} targetAction={modalAction} />
+      <AuthModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        targetAction={modalAction}
+        postId={activePostId}
+        contentElementId={null}
+      />
 
-      {/* ================= HEADER ================= */}
-      <header className="w-full bg-[#E5E7EB]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 shadow-sm bg-white">
-              <Image
-                src="/images/logo.jpeg"
-                alt="Unique Geography Notes Logo"
-                fill
-                sizes="48px"
-                className="object-cover"
-                priority
-              />
-            </div>
-            <div className="flex flex-col">
-              <h1 className="text-2xl md:text-[26px] font-black tracking-tight text-[#111827]">
-                Unique Geography Notes
-              </h1>
-              <span className="text-[13px] font-medium text-slate-500">
-                Curated by University Faculty
-              </span>
-            </div>
-          </Link>
+      {/* Reusable Navbar */}
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            <div className="relative w-full md:w-80">
-              <input
-                type="text"
-                suppressHydrationWarning
-                placeholder="Search by topic, class or exam..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-              />
-              <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400 stroke-[2.2]" />
-            </div>
-
-            <button className="bg-[#E5A83B] hover:bg-[#d49425] text-[#1e1b18] font-bold text-xs px-5 py-2.5 rounded-md transition shadow-sm whitespace-nowrap">
-              Latest PDFs
-            </button>
-          </div>
-        </div>
-
-        {/* Global Nav */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <Link href="/" className="py-3 px-1 text-slate-800 hover:text-black whitespace-nowrap">
-              Home
-            </Link>
-            <Link href="/category/upsc" className="py-3 px-1 text-slate-800 hover:text-black whitespace-nowrap">
-              UPSC &amp; PSC
-            </Link>
-
-            <div className="relative py-3 flex flex-col items-center">
-              <Link href="/category/school" className="font-bold text-slate-950 px-1 whitespace-nowrap">
-                School Notes
-              </Link>
-              <span className="absolute bottom-0 left-1 right-1 h-[2.5px] bg-[#E5A83B] rounded-full" />
-            </div>
-
-            <Link href="/category/exams" className="py-3 px-1 text-slate-800 hover:text-black whitespace-nowrap">
-              Exams (CTET, UGC-NET)
-            </Link>
-            <Link href="/category/university" className="py-3 px-1 text-slate-800 hover:text-black whitespace-nowrap">
-              University Notes
-            </Link>
-            <Link href="/category/gc" className="py-3 px-1 text-slate-800 hover:text-black whitespace-nowrap">
-              GC
-            </Link>
-          </div>
-        </nav>
-      </header>
-
-      {/* ================= BOARD SELECTOR (BSEB vs CBSE) ================= */}
+      {/* Board Selector Strip */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -365,12 +311,12 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= HERO SECTION ================= */}
+      {/* Hero Section */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-6 pb-10 w-full">
         <div className="text-xs font-semibold text-slate-500 mb-3 flex items-center gap-1.5">
           <Link href="/" className="hover:underline">Home</Link>
           <span>›</span>
-          <Link href="/category/school" className="hover:underline">School Notes</Link>
+          <Link href="/category/school/bseb" className="hover:underline">School Notes</Link>
           <span>›</span>
           <span className="text-[#E5A83B]">Bihar Board</span>
         </div>
@@ -403,7 +349,7 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= BSEB BOARD OPTIMIZED STRIP ================= */}
+      {/* BSEB Board Optimized Strip */}
       <section className="bg-[#D2D6DC] border-t border-b border-gray-300 py-3.5 px-4 sm:px-6 md:px-8">
         <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-start md:items-center gap-3 text-xs text-slate-800">
           <div className="flex items-center gap-2">
@@ -425,7 +371,7 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= CHOOSE YOUR CLASS CONTAINER ================= */}
+      {/* Choose Your Class Section */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-10 w-full">
         <div className="bg-[#F8EFE3] rounded-3xl p-6 sm:p-10 border border-amber-200/60 shadow-sm">
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -485,7 +431,7 @@ export default function BSEBPage() {
               ))}
             </div>
 
-            {/* Column 2: Higher Secondary & Specialist Track */}
+            {/* Column 2: Higher Secondary */}
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-[#0B2545] text-white text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
@@ -545,7 +491,7 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= BSEB EXAM SPECIAL RESOURCES ================= */}
+      {/* Special Resources Section */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-8">
           <div>
@@ -616,7 +562,7 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= DIRECT PDF QUICK FINDER ================= */}
+      {/* Direct PDF Quick Finder */}
       <section className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full">
         <div className="bg-[#D1D5DB] rounded-3xl p-8 sm:p-10 text-center shadow-inner">
           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-6">
@@ -661,7 +607,7 @@ export default function BSEBPage() {
         </div>
       </section>
 
-      {/* ================= LIVE CHAPTERS LIST FROM WORDPRESS ================= */}
+      {/* Live Chapters List From WordPress */}
       <section ref={notesSectionRef} className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1 mb-16">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
           <div>
@@ -676,7 +622,7 @@ export default function BSEBPage() {
           {activeClassFilter !== "all" && (
             <button
               onClick={() => handleSelectClass("all")}
-              className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-slate-50"
+              className="text-xs font-bold text-slate-700 bg-white px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-slate-50 cursor-pointer"
             >
               Clear Filter
             </button>
@@ -747,14 +693,14 @@ export default function BSEBPage() {
 
                 <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
                   <Link
-                    href={`/read/${item.id}`}
+                    href={`/read/${encodeURIComponent(item.slug)}`}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
                   >
                     <Eye className="w-3.5 h-3.5" /> Read Free
                   </Link>
 
                   <button
-                    onClick={() => openAuthPaywall(`Download ${item.title}`)}
+                    onClick={() => openAuthPaywall(`Download ${item.title}`, item.id)}
                     className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" /> Download

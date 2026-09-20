@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import Navbar from "../../../../components/Navbar";
 import AuthModal from "../../../../components/AuthModal";
 
 const CBSE_CLASSES = [
@@ -16,11 +16,12 @@ const CBSE_CLASSES = [
     exactSlugs: [
       "cbse-class-12-geography",
       "class-12-geography-notes",
+      "ncert-class-12-geography",
       "class-12-geography",
-      "ncert-class-12-geography"
+      "cbse-12th-geography"
     ],
     titleRegex: /\b(class[-_\s]*12\b|class[-_\s]*xii\b|12th\b)/i,
-    negativeRegex: /\b(6|7|8|9|10|11|vi|vii|viii|ix|x|xi)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|6|7|8|9|10|11|vi|vii|viii|ix|x|xi)\b/i,
   },
   {
     id: "class-11",
@@ -30,11 +31,12 @@ const CBSE_CLASSES = [
     exactSlugs: [
       "cbse-class-11-geography",
       "class-11-geography-notes",
+      "ncert-class-11-geography",
       "class-11-geography",
-      "ncert-class-11-geography"
+      "cbse-11th-geography"
     ],
     titleRegex: /\b(class[-_\s]*11\b|class[-_\s]*xi\b|11th\b)/i,
-    negativeRegex: /\b(12|xii)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|12|xii)\b/i,
   },
   {
     id: "class-10",
@@ -43,11 +45,12 @@ const CBSE_CLASSES = [
     roman: "X",
     exactSlugs: [
       "cbse-class-10-social-science",
+      "ncert-class-10-geography",
       "class-10-geography",
       "class-10-social-science"
     ],
     titleRegex: /\b(class[-_\s]*10\b|class[-_\s]*x\b|10th\b)/i,
-    negativeRegex: /\b(11|12|xi|xii)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|11|12|xi|xii)\b/i,
   },
   {
     id: "class-9",
@@ -56,38 +59,39 @@ const CBSE_CLASSES = [
     roman: "IX",
     exactSlugs: [
       "cbse-class-9-social-science",
+      "ncert-class-9-geography",
       "class-9-geography",
       "class-9-social-science"
     ],
     titleRegex: /\b(class[-_\s]*9\b|class[-_\s]*ix\b|9th\b)/i,
-    negativeRegex: /\b(10|11|12|x|xi|xii)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|10|11|12|x|xi|xii)\b/i,
   },
   {
     id: "class-8",
     label: "Class 8th Geography",
     num: 8,
     roman: "VIII",
-    exactSlugs: ["cbse-class-8-geography", "class-8-geography"],
+    exactSlugs: ["cbse-class-8-geography", "ncert-class-8-geography", "class-8-geography"],
     titleRegex: /\b(class[-_\s]*8\b|class[-_\s]*viii\b|8th\b)/i,
-    negativeRegex: null,
+    negativeRegex: /\b(bihar|bseb|बिहार)\b/i,
   },
   {
     id: "class-7",
     label: "Class 7th Geography",
     num: 7,
     roman: "VII",
-    exactSlugs: ["cbse-class-7-geography", "class-7-geography"],
+    exactSlugs: ["cbse-class-7-geography", "ncert-class-7-geography", "class-7-geography"],
     titleRegex: /\b(class[-_\s]*7\b|class[-_\s]*vii\b|7th\b)/i,
-    negativeRegex: /\b(8|viii)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|8|viii)\b/i,
   },
   {
     id: "class-6",
     label: "Class 6th Geography",
     num: 6,
     roman: "VI",
-    exactSlugs: ["cbse-class-6-geography", "class-6-geography"],
+    exactSlugs: ["cbse-class-6-geography", "ncert-class-6-geography", "class-6-geography"],
     titleRegex: /\b(class[-_\s]*6\b|class[-_\s]*vi\b|6th\b)/i,
-    negativeRegex: /\b(7|8|vii|viii)\b/i,
+    negativeRegex: /\b(bihar|bseb|बिहार|7|8|vii|viii)\b/i,
   },
 ];
 
@@ -113,7 +117,10 @@ export default function CbsePage() {
 
   useEffect(() => {
     async function fetchCbseWordPressData() {
-      const wpUrl = process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com";
+      const wpUrl = (
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+      ).replace(/\/+$/, "");
+
       setDataLoading(true);
 
       try {
@@ -201,8 +208,8 @@ export default function CbsePage() {
       const title = (pg.title?.rendered || "").toLowerCase();
       const textToTest = `${slug} ${title}`;
 
-      const isCbseOrNcert = textToTest.includes("cbse") || textToTest.includes("ncert") || textToTest.includes("class");
-      if (!isCbseOrNcert) return false;
+      const isBihar = textToTest.includes("bihar") || textToTest.includes("bseb") || textToTest.includes("बिहार");
+      if (isBihar) return false;
 
       const hasPositive = currentClassConfig.titleRegex.test(textToTest);
       if (!hasPositive) return false;
@@ -232,11 +239,13 @@ export default function CbsePage() {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch = q === "" || p.corpus.includes(q);
 
-      const isSchool = p.corpus.includes("cbse") || p.corpus.includes("ncert") || p.corpus.includes("class");
+      const isBihar = p.corpus.includes("bihar") || p.corpus.includes("bseb") || p.corpus.includes("बिहार");
+      if (isBihar) return false;
+
       const hasPositive = currentClassConfig.titleRegex.test(p.corpus);
       const passesNegative = !currentClassConfig.negativeRegex || !currentClassConfig.negativeRegex.test(p.corpus);
 
-      const matchesClass = isSchool && hasPositive && passesNegative;
+      const matchesClass = hasPositive && passesNegative;
       return matchesSearch && (matchesClass || q !== "");
     });
   }, [allPosts, currentClassConfig, searchQuery]);
@@ -281,50 +290,38 @@ export default function CbsePage() {
         contentElementId="printable-content"
       />
 
-      {/* Header */}
-      <header className="w-full bg-[#E5E7EB]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 bg-white shadow-xs">
-              <Image src="/images/logo.jpeg" alt="Logo" fill sizes="48px" className="object-cover" priority />
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+
+      {/* Board Switcher */}
+      <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Board:</span>
+            <div className="inline-flex p-1 bg-white/80 rounded-xl border border-gray-300 shadow-sm gap-1">
+              <Link
+                href="/category/school/cbse"
+                className="text-xs font-bold px-5 py-2 rounded-lg transition cursor-pointer bg-[#0B2545] text-white shadow"
+              >
+                CBSE &amp; NCERT
+              </Link>
+              <Link
+                href="/category/school/bseb"
+                className="text-xs font-bold px-5 py-2 rounded-lg transition cursor-pointer text-slate-600 hover:text-black hover:bg-white"
+              >
+                Bihar Board (BSEB)
+              </Link>
             </div>
-            <div>
-              <h1 className="text-2xl md:text-[26px] font-black tracking-tight text-[#111827]">
-                Unique Geography Notes
-              </h1>
-              <span className="text-[13px] font-medium text-slate-500">CBSE &amp; NCERT Curriculum Notes</span>
-            </div>
+          </div>
+          <Link
+            href="/category/school"
+            className="text-xs font-bold text-slate-600 hover:text-slate-950 underline"
+          >
+            ← Back to School Hub
           </Link>
-
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              placeholder="Search chapter, topic or book..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-            />
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-          </div>
         </div>
+      </section>
 
-        {/* Navigation */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <Link href="/" className="py-3 px-1 hover:text-black whitespace-nowrap">Home</Link>
-            <Link href="/category/upsc" className="py-3 px-1 hover:text-black whitespace-nowrap">UPSC &amp; PSC</Link>
-            <div className="relative py-3 flex flex-col items-center">
-              <Link href="/category/school/cbse" className="font-bold text-slate-950 px-1 whitespace-nowrap">School Notes (CBSE)</Link>
-              <span className="absolute bottom-0 left-1 right-1 h-[2.5px] bg-[#E5A83B] rounded-full" />
-            </div>
-            <Link href="/category/school/bseb" className="py-3 px-1 hover:text-black whitespace-nowrap">Bihar Board (BSEB)</Link>
-            <Link href="/category/university" className="py-3 px-1 hover:text-black whitespace-nowrap">University Notes</Link>
-            <Link href="/category/exams" className="py-3 px-1 hover:text-black whitespace-nowrap">Exams</Link>
-          </div>
-        </nav>
-      </header>
-
-      {/* Class Selector Strip */}
+      {/* Class Horizontal Selector Strip */}
       <section className="border-b border-gray-300 bg-[#DFE2E8]">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3 sm:gap-6 overflow-x-auto text-[13px] font-semibold text-slate-700">
           {CBSE_CLASSES.map((cls) => (
@@ -345,13 +342,12 @@ export default function CbsePage() {
 
       {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-
-        {/* 1. Live Syllabus / Chapter Outline */}
+        {/* 1. Live Syllabus Outline */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
             <div>
               <span className="text-[11px] font-extrabold text-[#B45309] uppercase tracking-wider block">
-                NCERT / CBSE Syllabus Outline
+                NCERT / CBSE Curriculum
               </span>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900">
                 {currentClassConfig.label} Chapters &amp; Topics
@@ -382,6 +378,7 @@ export default function CbsePage() {
             </div>
           ) : (
             <div
+              id="printable-content"
               onClick={handleContentClick}
               className="prose max-w-none text-slate-800 leading-relaxed
                 [&_a]:text-blue-600 [&_a]:font-semibold [&_a:hover]:underline [&_a]:cursor-pointer
@@ -465,7 +462,6 @@ export default function CbsePage() {
             </div>
           )}
         </section>
-
       </div>
     </main>
   );
