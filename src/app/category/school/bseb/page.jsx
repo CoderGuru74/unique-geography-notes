@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
-  Search, 
   ChevronRight, 
   CheckCircle2, 
   FileText, 
@@ -54,7 +53,7 @@ const SPECIAL_RESOURCES = [
     borderColor: "border-t-4 border-t-[#DC2626]",
     icon: FileText,
     iconColor: "text-[#DC2626] bg-[#FEF2F2]",
-    badges: ["BSEB Pattern", "2020–2026", "Answer Key Included"],
+    badges: ["BSEB Pattern", "Answer Key Included"],
     buttonText: "Get Question Papers",
     fileKey: "bseb_model_papers_pdf",
   },
@@ -132,7 +131,7 @@ export default function BSEBPage() {
   // 1. Fetch categories to discover exact WordPress Category IDs for BSEB
   useEffect(() => {
     async function loadCategories() {
-      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com").replace(/\/+$/, "");
+      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms").replace(/\/+$/, "");
 
       try {
         const res = await fetch(`${wpUrl}/wp-json/wp/v2/categories?per_page=100&hide_empty=false`);
@@ -151,7 +150,7 @@ export default function BSEBPage() {
   // 2. Query posts targeted strictly to BSEB
   useEffect(() => {
     async function fetchBSEBContent() {
-      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com").replace(/\/+$/, "");
+      const wpUrl = (process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms").replace(/\/+$/, "");
 
       setLoading(true);
       try {
@@ -281,7 +280,7 @@ export default function BSEBPage() {
       />
 
       {/* Reusable Navbar */}
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
       {/* Board Selector Strip */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
@@ -573,7 +572,7 @@ export default function BSEBPage() {
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="w-full sm:w-1/2 bg-white text-xs px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
+              className="w-full sm:w-1/2 bg-white text-xs px-4 py-3 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-1 focus:ring-[#E5A83B]"
             >
               <option value="">Select Exam/Class</option>
               <option value="class-6">Class 6</option>
@@ -588,7 +587,7 @@ export default function BSEBPage() {
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full sm:w-1/2 bg-white text-xs px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
+              className="w-full sm:w-1/2 bg-white text-xs px-4 py-3 rounded-xl border border-gray-300 focus:outline-hidden focus:ring-1 focus:ring-[#E5A83B]"
             >
               <option value="">Select Subject / Chapter</option>
               <option value="geography">Geography (भूगोल)</option>
@@ -599,7 +598,7 @@ export default function BSEBPage() {
 
             <button
               type="submit"
-              className="w-full sm:w-auto bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs px-8 py-3 rounded-xl shadow transition whitespace-nowrap cursor-pointer"
+              className="w-full sm:w-auto bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs px-8 py-3 rounded-xl shadow-xs transition whitespace-nowrap cursor-pointer"
             >
               Find Notes Now
             </button>
@@ -616,7 +615,7 @@ export default function BSEBPage() {
               {activeClassFilter !== "all" && ` — Class ${activeClassFilter}`}
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Showing {displayedPosts.length} syllabus notes from WordPress
+              Curated faculty notes and solutions updated as per current syllabus
             </p>
           </div>
           {activeClassFilter !== "all" && (
@@ -701,7 +700,7 @@ export default function BSEBPage() {
 
                   <button
                     onClick={() => openAuthPaywall(`Download ${item.title}`, item.id)}
-                    className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                    className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" /> Download
                   </button>

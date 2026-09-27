@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Eye, Download, Loader2, FileText, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Download, Loader2, FileText, FileCheck, Lock, BookOpen, Mail, ShieldCheck, Heart } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
@@ -13,6 +13,35 @@ const EXAM_CATEGORIES = [
     label: "सभी परीक्षा नोट्स (All Exams)",
     slugPatterns: [],
     keywords: [],
+    bgClass: "bg-[#0B2545] hover:bg-[#081B33] text-white", // Dark Navy
+  },
+  {
+    id: "test-series",
+    label: "🔥 Test Series & Mock Papers",
+    enLabel: "Official Printable Test Series & Model Question Papers",
+    slugPatterns: [
+      "test-series",
+      "test",
+      "mock-test",
+      "practice-set",
+      "model-paper",
+      "test-paper",
+      "online-test",
+      "quiz",
+    ],
+    keywords: [
+      "test series",
+      "test",
+      "mock test",
+      "टेस्ट सीरीज",
+      "टेस्ट सीरीज़",
+      "मॉडल पेपर",
+      "अभ्यास प्रश्न",
+      "practice set",
+      "model paper",
+      "test paper",
+    ],
+    bgClass: "bg-[#E11D48] hover:bg-[#BE123C] text-white", // Vibrant Crimson/Rose
   },
   {
     id: "ctet",
@@ -20,6 +49,7 @@ const EXAM_CATEGORIES = [
     enLabel: "Central Teacher Eligibility Test",
     slugPatterns: ["ctet", "ctet-notes", "ctet-paper-1", "ctet-paper-2"],
     keywords: ["ctet", "सीटेट", "सी-टेट", "child pedo", "pedagogy"],
+    bgClass: "bg-[#DC2626] hover:bg-[#B91C1C] text-white", // Crimson Red
   },
   {
     id: "ugc-net",
@@ -27,6 +57,7 @@ const EXAM_CATEGORIES = [
     enLabel: "UGC NET Paper 1 & Paper 2",
     slugPatterns: ["ugc-net", "net-jrf", "ugc-net-jrf", "net-paper-2"],
     keywords: ["ugc-net", "ugc net", "jrf", "नेट", "जेआरएफ"],
+    bgClass: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white", // Royal Blue
   },
   {
     id: "bpsc-teacher",
@@ -34,6 +65,7 @@ const EXAM_CATEGORIES = [
     enLabel: "BPSC Teacher Geography & GS",
     slugPatterns: ["bpsc-teacher", "bpsc-tre", "bpsc-shikshak"],
     keywords: ["bpsc teacher", "bpsc tre", "शिक्षक भर्ती", "शिक्षक"],
+    bgClass: "bg-[#16A34A] hover:bg-[#15803D] text-white", // Forest Green
   },
   {
     id: "tgt-pgt-stet",
@@ -41,6 +73,7 @@ const EXAM_CATEGORIES = [
     enLabel: "Secondary & Higher Secondary Teacher Exams",
     slugPatterns: ["kvs-nvs", "tgt-pgt", "stet", "kvs", "nvs", "pgt-geography"],
     keywords: ["kvs", "nvs", "tgt", "pgt", "stet", "एसटेट"],
+    bgClass: "bg-[#7C3AED] hover:bg-[#6D28D9] text-white", // Deep Purple
   },
   {
     id: "solved-papers",
@@ -48,15 +81,28 @@ const EXAM_CATEGORIES = [
     enLabel: "Previous Year Papers",
     slugPatterns: ["solved-paper", "previous-year", "question-paper", "mcq"],
     keywords: ["solved paper", "previous year", "प्रश्न पत्र", "हल प्रश्न", "mcq"],
+    bgClass: "bg-[#D97706] hover:bg-[#B45309] text-white", // Amber Orange
   },
 ];
+
+function decodeHtmlEntities(str) {
+  if (!str) return "";
+  return str
+    .replace(/&#8217;/g, "’")
+    .replace(/&#8216;/g, "‘")
+    .replace(/&#8220;/g, "“")
+    .replace(/&#8221;/g, "”")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'");
+}
 
 export default function ExamsPage() {
   const router = useRouter();
 
-  const [activeExam, setActiveExam] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-
+  const [activeExam, setActiveExam] = useState("test-series");
   const [allPages, setAllPages] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -64,11 +110,11 @@ export default function ExamsPage() {
   const [selectedPageIndex, setSelectedPageIndex] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState("Download Exam Notes PDF");
+  const [modalAction, setModalAction] = useState("Download Test Series PDF");
   const [activePostId, setActivePostId] = useState(null);
 
   const openDownloadModal = (title, postId) => {
-    setModalAction(title);
+    setModalAction(decodeHtmlEntities(title));
     setActivePostId(postId);
     setModalOpen(true);
   };
@@ -78,7 +124,7 @@ export default function ExamsPage() {
 
     async function fetchExamsWordPressData() {
       const baseDomain = (
-        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
       ).replace(/\/+$/, "");
 
       setDataLoading(true);
@@ -87,7 +133,6 @@ export default function ExamsPage() {
         let pagesData = [];
         let postsData = [];
 
-        // Safe Pages Fetch
         try {
           const pagesRes = await fetch(`${baseDomain}/wp-json/wp/v2/pages?per_page=100&_embed`);
           if (pagesRes.ok) {
@@ -97,7 +142,6 @@ export default function ExamsPage() {
           console.warn("Could not fetch Exam pages from WordPress:", e.message);
         }
 
-        // Safe Posts Fetch
         try {
           const postsRes = await fetch(
             `${baseDomain}/wp-json/wp/v2/posts?_fields=id,date,title,excerpt,content,slug,acf,_links,_embed&_embed=wp:term&per_page=100`
@@ -115,14 +159,17 @@ export default function ExamsPage() {
 
         if (Array.isArray(postsData)) {
           const formattedPosts = postsData.map((p) => {
-            const title = p.title?.rendered || "";
-            const excerpt = p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "";
+            const rawTitle = p.title?.rendered || "";
+            const rawExcerpt = p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "";
+            const title = decodeHtmlEntities(rawTitle);
+            const excerpt = decodeHtmlEntities(rawExcerpt);
+
             return {
               id: p.id,
               title: title,
               excerpt: excerpt,
               content: p.content?.rendered || "",
-              slug: p.slug || "",
+              slug: p.slug || String(p.id),
               date: p.date
                 ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
                 : "",
@@ -156,8 +203,13 @@ export default function ExamsPage() {
   function cleanAndRewriteWordPressLinks(html) {
     if (!html) return "";
 
-    return html.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+    let cleaned = html.replace(
+      /<div[^>]*class="[^"]*(?:quiz|question-box|exam-timer)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+      ""
+    );
+
+    return cleaned.replace(
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
       (match, domain, path) => {
         let cleanPath = path.replace(/^\/+|\/+$/g, "");
         try {
@@ -176,9 +228,10 @@ export default function ExamsPage() {
     );
   }
 
-  // Active Exam Category से जुड़े WordPress Pages
   const examPages = useMemo(() => {
-    if (!allPages || allPages.length === 0 || activeExam === "all") return [];
+    if (!allPages || allPages.length === 0 || activeExam === "all" || activeExam === "test-series") {
+      return [];
+    }
 
     return allPages
       .filter((pg) => {
@@ -206,15 +259,11 @@ export default function ExamsPage() {
 
   const activePage = examPages[selectedPageIndex] || examPages[0] || null;
 
-  // Active Exam Category से जुड़े Posts / Material
   const filteredPosts = useMemo(() => {
     if (!allPosts || allPosts.length === 0) return [];
 
     return allPosts.filter((p) => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch = q === "" || p.corpus.includes(q);
-
-      if (activeExam === "all") return matchesSearch;
+      if (activeExam === "all") return true;
 
       const matchesKeyword = currentExamConfig.keywords.some((kw) =>
         p.corpus.includes(kw.toLowerCase())
@@ -223,9 +272,9 @@ export default function ExamsPage() {
         p.corpus.includes(pattern.toLowerCase())
       );
 
-      return matchesSearch && (matchesKeyword || matchesPattern);
+      return matchesKeyword || matchesPattern;
     });
-  }, [allPosts, currentExamConfig, activeExam, searchQuery]);
+  }, [allPosts, currentExamConfig, activeExam]);
 
   const handleContentClick = (e) => {
     const targetLink = e.target.closest("a");
@@ -237,7 +286,7 @@ export default function ExamsPage() {
     e.preventDefault();
 
     let cleanPath = href
-      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
 
@@ -267,46 +316,66 @@ export default function ExamsPage() {
         contentElementId="printable-content"
       />
 
-      {/* Global Navbar */}
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
-      {/* Sub-header Banner */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Exam Portal:</span>
             <span className="text-xs font-bold text-slate-900 bg-white/80 px-3 py-1 rounded-lg border border-gray-300 shadow-xs">
-              CTET • UGC-NET / JRF • BPSC Teacher • KVS / NVS / TGT / PGT / STET
+              Test Series &amp; Mock Papers • UGC-NET • BPSC TRE • CTET • KVS/NVS
             </span>
           </div>
           <span className="text-xs font-semibold text-slate-600 bg-white/50 px-3 py-1 rounded-full border border-gray-300 hidden sm:inline">
-            Verified Exam Syllabus &amp; Solutions
+            Printable Question Papers &amp; Solution Keys
           </span>
         </div>
       </section>
 
-      {/* Exam Categories Selector Bar */}
-      <section className="border-b border-gray-300 bg-[#DFE2E8]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2 sm:gap-3 overflow-x-auto text-[13px] font-semibold text-slate-700 py-1.5">
-          {EXAM_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setActiveExam(cat.id)}
-              className={`py-2.5 px-3.5 rounded-lg whitespace-nowrap transition cursor-pointer ${
-                activeExam === cat.id
-                  ? "bg-[#0B2545] text-white font-bold shadow-xs"
-                  : "hover:text-black hover:bg-white/60"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+      {/* Categories Bar */}
+      <section className="border-b border-gray-300 bg-[#DFE2E8] py-2.5">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2.5 overflow-x-auto text-[13px]">
+          {EXAM_CATEGORIES.map((cat) => {
+            const isSelected = activeExam === cat.id;
+
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveExam(cat.id)}
+                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-bold text-xs sm:text-[13px] shadow-sm flex items-center gap-2 border ${cat.bgClass} ${
+                  isSelected
+                    ? "ring-3 ring-amber-400 border-white scale-105"
+                    : "opacity-90 hover:opacity-100 border-black/10"
+                }`}
+              >
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        {/* अगर WordPress पर इस एग्जाम के कई पेजेस हैं तो पेज टैब्स दिखाएं */}
+        {/* Notice Card for Test Series */}
+        {activeExam === "test-series" && (
+          <div className="bg-white border border-amber-300/80 rounded-2xl p-4 sm:p-5 mb-8 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-amber-100 rounded-xl text-amber-700 shrink-0">
+                <FileCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">
+                  Official Printable Test Series &amp; Practice Sets
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Click <strong>&quot;Download PDF&quot;</strong> to unlock and download complete question papers with detailed answer keys.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Page Switcher Tabs if multiple pages exist */}
         {examPages.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto mb-4 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -327,13 +396,13 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* 1. WordPress Page Content Section (केवल तभी दिखेगा जब वर्डप्रेस पर पेज उपलब्ध हो) */}
-        {activePage && (
+        {/* Standard Content Overview Card (Only for non-test-series syllabus categories) */}
+        {activePage && activeExam !== "test-series" && (
           <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
               <div>
                 <span className="text-[11px] font-extrabold text-[#B45309] uppercase tracking-wider block">
-                  {currentExamConfig.enLabel || "Exam Curriculum & Solution Overview"}
+                  {currentExamConfig.enLabel || "Exam Question Paper & Solution Overview"}
                 </span>
                 <h2
                   className="text-xl sm:text-2xl font-black text-slate-900"
@@ -345,7 +414,7 @@ export default function ExamsPage() {
               <button
                 onClick={() =>
                   openDownloadModal(
-                    activePage.title || `${currentExamConfig.label} Notes`,
+                    activePage.title || `${currentExamConfig.label} Paper`,
                     activePage.id
                   )
                 }
@@ -370,15 +439,15 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* 2. Downloadable Notes / Question Papers List */}
+        {/* Available Test Series & Papers Grid */}
         <section className="w-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {currentExamConfig.label} — Study Materials &amp; Question Papers
+                {currentExamConfig.label} — Available Test Sets &amp; Question Papers
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                {filteredPosts.length} downloadable PDFs &amp; study units available.
+                Complete mock tests, practice questions, and answer keys.
               </p>
             </div>
             {activeExam !== "all" && (
@@ -394,22 +463,22 @@ export default function ExamsPage() {
           {dataLoading ? (
             <div className="bg-white rounded-3xl p-14 flex flex-col items-center justify-center text-slate-500 border border-gray-200">
               <Loader2 className="w-6 h-6 animate-spin text-[#E5A83B] mb-2" />
-              <p className="text-xs font-semibold">Loading exam materials from server...</p>
+              <p className="text-xs font-semibold">Loading test papers from server...</p>
             </div>
-          ) : filteredPosts.length === 0 && !activePage ? (
+          ) : filteredPosts.length === 0 ? (
             <div className="bg-white/80 rounded-3xl p-12 text-center text-slate-500 border border-gray-200">
               <FileText className="w-10 h-10 text-amber-500/50 mb-2 mx-auto" />
               <h4 className="font-bold text-sm text-slate-800">
-                No materials currently uploaded for {currentExamConfig.label}
+                No papers currently uploaded for {currentExamConfig.label}
               </h4>
               <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
-                This section is currently being updated with fresh syllabus notes and solved papers.
+                Test papers and solution keys uploaded via WordPress will appear here automatically.
               </p>
               <button
                 onClick={() => setActiveExam("all")}
                 className="px-4 py-2 bg-[#0B2545] text-white text-xs font-bold rounded-xl cursor-pointer"
               >
-                View All Available Exam Notes
+                View All Available Exam Papers
               </button>
             </div>
           ) : (
@@ -420,35 +489,33 @@ export default function ExamsPage() {
                   className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
                 >
                   <div>
-                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
-                      {currentExamConfig.id === "all" ? "Exam Material" : currentExamConfig.label}
+                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-3 border border-amber-200">
+                      {currentExamConfig.id === "all" ? "Test Series / Notes" : currentExamConfig.label}
                     </span>
 
+                    {/* Full Heading (no truncation/line-clamp) - strictly non-clickable without payment */}
                     <h4
-                      className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
+                      className="font-black text-sm sm:text-base text-slate-900 leading-snug mb-2"
                       dangerouslySetInnerHTML={{ __html: item.title }}
                     />
 
+                    {/* Short excerpt description */}
                     {item.excerpt && (
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                      <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mb-4">
                         {item.excerpt}
                       </p>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      href={`/read/${item.id}`}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Read
-                    </Link>
-
+                  {/* Single Locked Download Button */}
+                  <div className="pt-3 border-t border-gray-100">
                     <button
                       onClick={() => openDownloadModal(item.title, item.id)}
-                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                      className="w-full bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-black text-xs py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs transition cursor-pointer active:scale-[0.98]"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
+                      <Lock className="w-3.5 h-3.5 text-slate-900" />
+                      <Download className="w-3.5 h-3.5 text-slate-900" />
+                      <span>Download PDF</span>
                     </button>
                   </div>
                 </div>
@@ -457,6 +524,85 @@ export default function ExamsPage() {
           )}
         </section>
       </div>
+
+      {/* Built-in Full Footer */}
+      <footer className="w-full bg-[#0B2545] text-slate-200 mt-auto border-t border-slate-800">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Brand Information */}
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-400 text-slate-950 rounded-lg">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <span className="text-base font-black text-white tracking-wide">
+                  Unique Geography Notes
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-md">
+                Complete UPSC, BPSC, UGC NET/JRF, CTET, KVS/NVS एवं विश्वविद्यालय स्तर के भूगोल अध्ययन सामग्री और टेस्ट सीरीज का प्रामाणिक मंच।
+              </p>
+              <div className="flex items-center gap-2 text-[11px] text-amber-400 font-semibold pt-1">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Verified Handwritten &amp; Digital Study Material</span>
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                त्वरित लिंक्स
+              </h4>
+              <ul className="space-y-1.5 text-xs text-slate-300">
+                <li>
+                  <Link href="/" className="hover:text-white transition">
+                    मुख्य पृष्ठ (Home)
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/category/exams/" className="hover:text-white transition">
+                    टेस्ट सीरीज एवं मॉक टेस्ट
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/read/geography-of-bihar" className="hover:text-white transition">
+                    बिहार का भूगोल
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/read/research-methodology" className="hover:text-white transition">
+                    रिसर्च मेथोडोलॉजी
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Support / Contact */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                सहायता एवं संपर्क
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                किसी भी सहायता, सुझाव अथवा पीडीएफ डाउनलोड समस्या के लिए संपर्क करें:
+              </p>
+              <a
+                href="mailto:support@geographynotespdf.com"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:underline pt-1"
+              >
+                <Mail className="w-3.5 h-3.5" /> support@geographynotespdf.com
+              </a>
+            </div>
+          </div>
+
+          {/* Bottom Copyright Strip */}
+          <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+            <span>© {new Date().getFullYear()} Unique Geography Notes. All Rights Reserved.</span>
+            <span className="flex items-center gap-1 text-slate-400">
+              Made with <Heart className="w-3 h-3 text-red-500 fill-red-500" /> for Geography Aspirants
+            </span>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Eye, Download, Loader2, FileText, ChevronRight } from "lucide-react";
+import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
@@ -13,6 +13,7 @@ const UPSC_TOPICS = [
     label: "सभी विषय (All Topics)",
     slugPatterns: [],
     keywords: [],
+    bgClass: "bg-[#0B2545] hover:bg-[#081B33] text-white", // Dark Navy
   },
   {
     id: "geomorphology",
@@ -20,6 +21,7 @@ const UPSC_TOPICS = [
     enLabel: "Geomorphology",
     slugPatterns: ["geomorphology", "bhoo-aakriti", "geomorph", "bhu-aakriti"],
     keywords: ["भू-आकृति", "भू आकृति", "भूआकृति", "geomorphology"],
+    bgClass: "bg-[#DC2626] hover:bg-[#B91C1C] text-white", // Crimson Red
   },
   {
     id: "climatology",
@@ -27,6 +29,7 @@ const UPSC_TOPICS = [
     enLabel: "Climatology",
     slugPatterns: ["climatology", "jalvayu-vigyan", "jalvayu"],
     keywords: ["जलवायु", "climatology"],
+    bgClass: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white", // Royal Blue
   },
   {
     id: "oceanography",
@@ -34,6 +37,7 @@ const UPSC_TOPICS = [
     enLabel: "Oceanography",
     slugPatterns: ["oceanography", "samudra-vigyan", "samudra"],
     keywords: ["समुद्र विज्ञान", "महासागर", "oceanography"],
+    bgClass: "bg-[#0284C7] hover:bg-[#0369A1] text-white", // Ocean Blue
   },
   {
     id: "thought",
@@ -41,6 +45,7 @@ const UPSC_TOPICS = [
     enLabel: "Geographical Thought",
     slugPatterns: ["geographical-thought", "bhaugolik-chintan", "thought"],
     keywords: ["भौगोलिक चिंतन", "भौगोलिक चिन्तन", "geographical thought"],
+    bgClass: "bg-[#7C3AED] hover:bg-[#6D28D9] text-white", // Deep Purple
   },
   {
     id: "political",
@@ -48,6 +53,7 @@ const UPSC_TOPICS = [
     enLabel: "Political Geography",
     slugPatterns: ["political-geography", "rajnitik-bhugol"],
     keywords: ["राजनीतिक भूगोल", "राजनैतिक भूगोल", "political geography"],
+    bgClass: "bg-[#D97706] hover:bg-[#B45309] text-white", // Amber Orange
   },
   {
     id: "regional",
@@ -55,6 +61,7 @@ const UPSC_TOPICS = [
     enLabel: "Regional Geography",
     slugPatterns: ["regional-geography", "pradeshik-bhugol", "regional-planning"],
     keywords: ["प्रादेशिक भूगोल", "प्रादेशिक नियोजन", "regional geography"],
+    bgClass: "bg-[#16A34A] hover:bg-[#15803D] text-white", // Forest Green
   },
   {
     id: "economic",
@@ -62,6 +69,7 @@ const UPSC_TOPICS = [
     enLabel: "Economic Geography",
     slugPatterns: ["economic-geography", "aarthik-bhugol"],
     keywords: ["आर्थिक भूगोल", "economic geography"],
+    bgClass: "bg-[#0D9488] hover:bg-[#0F766E] text-white", // Teal
   },
   {
     id: "human",
@@ -69,6 +77,7 @@ const UPSC_TOPICS = [
     enLabel: "Human Geography",
     slugPatterns: ["human-geography", "manav-bhugol"],
     keywords: ["मानव भूगोल", "human geography"],
+    bgClass: "bg-[#E11D48] hover:bg-[#BE123C] text-white", // Rose Red
   },
   {
     id: "settlement",
@@ -76,6 +85,7 @@ const UPSC_TOPICS = [
     enLabel: "Settlement Geography",
     slugPatterns: ["settlement-geography", "gramin-nagariya-bhugol", "urban-geography"],
     keywords: ["ग्रामीण", "नगरीय भूगोल", "अधिवास भूगोल", "settlement geography"],
+    bgClass: "bg-[#4F46E5] hover:bg-[#4338CA] text-white", // Indigo
   },
   {
     id: "environmental",
@@ -83,6 +93,7 @@ const UPSC_TOPICS = [
     enLabel: "Environmental Geography",
     slugPatterns: ["environmental-geography", "paryavaran-bhugol"],
     keywords: ["पर्यावरण भूगोल", "पारिस्थितिकी", "environmental geography"],
+    bgClass: "bg-[#059669] hover:bg-[#047857] text-white", // Emerald Green
   },
   {
     id: "practical",
@@ -90,6 +101,7 @@ const UPSC_TOPICS = [
     enLabel: "Cartography & Practical",
     slugPatterns: ["practical-geography", "cartography", "prayogik-bhugol"],
     keywords: ["practical", "प्रायोगिक भूगोल", "मानचित्रण", "cartography"],
+    bgClass: "bg-[#475569] hover:bg-[#334155] text-white", // Slate Gray
   },
   {
     id: "population",
@@ -97,6 +109,7 @@ const UPSC_TOPICS = [
     enLabel: "Population Geography",
     slugPatterns: ["population-geography", "jansankhya-bhugol"],
     keywords: ["जनसंख्या भूगोल", "जनसांख्यिकी", "population geography"],
+    bgClass: "bg-[#C026D3] hover:bg-[#A21CAF] text-white", // Fuchsia
   },
   {
     id: "india",
@@ -104,6 +117,7 @@ const UPSC_TOPICS = [
     enLabel: "Geography of India",
     slugPatterns: ["geography-of-india", "bharat-ka-bhugol", "indian-geography"],
     keywords: ["भारत का भूगोल", "भारतीय भूगोल", "geography of india"],
+    bgClass: "bg-[#EA580C] hover:bg-[#C2410C] text-white", // Orange / Saffron
   },
 ];
 
@@ -111,8 +125,6 @@ export default function UpscPage() {
   const router = useRouter();
 
   const [activeTopic, setActiveTopic] = useState("geomorphology");
-  const [searchQuery, setSearchQuery] = useState("");
-
   const [allPages, setAllPages] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -134,7 +146,7 @@ export default function UpscPage() {
 
     async function fetchWordPressData() {
       const baseDomain = (
-        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
       ).replace(/\/+$/, "");
 
       setDataLoading(true);
@@ -176,7 +188,7 @@ export default function UpscPage() {
               title: title,
               excerpt: excerpt,
               content: p.content?.rendered || "",
-              slug: p.slug || "",
+              slug: p.slug || String(p.id),
               date: p.date
                 ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
                 : "",
@@ -211,7 +223,7 @@ export default function UpscPage() {
     if (!html) return "";
 
     return html.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
       (match, domain, path) => {
         let cleanPath = path.replace(/^\/+|\/+$/g, "");
         try {
@@ -230,7 +242,6 @@ export default function UpscPage() {
     );
   }
 
-  // टॉपिक से जुड़े सभी वर्डप्रेस पेजेस को निकालना
   const topicPages = useMemo(() => {
     if (!allPages || allPages.length === 0) return [];
 
@@ -269,15 +280,11 @@ export default function UpscPage() {
 
   const activePage = topicPages[selectedPageIndex] || topicPages[0] || null;
 
-  // टॉपिक से जुड़े आर्टिकल्स/पोस्ट्स
   const filteredPosts = useMemo(() => {
     if (!allPosts || allPosts.length === 0) return [];
 
     return allPosts.filter((p) => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch = q === "" || p.corpus.includes(q);
-
-      if (activeTopic === "all") return matchesSearch;
+      if (activeTopic === "all") return true;
 
       const matchesKeyword = currentTopicConfig.keywords.some((kw) =>
         p.corpus.includes(kw.toLowerCase())
@@ -286,9 +293,9 @@ export default function UpscPage() {
         p.corpus.includes(pattern.toLowerCase())
       );
 
-      return matchesSearch && (matchesKeyword || matchesPattern);
+      return matchesKeyword || matchesPattern;
     });
-  }, [allPosts, currentTopicConfig, activeTopic, searchQuery]);
+  }, [allPosts, currentTopicConfig, activeTopic]);
 
   const handleContentClick = (e) => {
     const targetLink = e.target.closest("a");
@@ -300,7 +307,7 @@ export default function UpscPage() {
     e.preventDefault();
 
     let cleanPath = href
-      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
 
@@ -330,10 +337,8 @@ export default function UpscPage() {
         contentElementId="printable-content"
       />
 
-      {/* Global Navbar */}
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
-      {/* Sub-header Banner */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -348,28 +353,30 @@ export default function UpscPage() {
         </div>
       </section>
 
-      {/* 13 Topics Horizontal Selector */}
-      <section className="border-b border-gray-300 bg-[#DFE2E8]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2 sm:gap-3 overflow-x-auto text-[13px] font-semibold text-slate-700 py-1.5">
-          {UPSC_TOPICS.map((topic) => (
-            <button
-              key={topic.id}
-              onClick={() => setActiveTopic(topic.id)}
-              className={`py-2.5 px-3.5 rounded-lg whitespace-nowrap transition cursor-pointer ${
-                activeTopic === topic.id
-                  ? "bg-[#0B2545] text-white font-bold shadow-xs"
-                  : "hover:text-black hover:bg-white/60"
-              }`}
-            >
-              {topic.label}
-            </button>
-          ))}
+      {/* Full Solid Colored Box Buttons Strip */}
+      <section className="border-b border-gray-300 bg-[#DFE2E8] py-2.5">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2.5 overflow-x-auto text-[13px]">
+          {UPSC_TOPICS.map((topic) => {
+            const isSelected = activeTopic === topic.id;
+
+            return (
+              <button
+                key={topic.id}
+                onClick={() => setActiveTopic(topic.id)}
+                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-bold text-xs sm:text-[13px] shadow-sm flex items-center gap-2 border ${topic.bgClass} ${
+                  isSelected
+                    ? "ring-3 ring-amber-400 border-white scale-105"
+                    : "opacity-90 hover:opacity-100 border-black/10"
+                }`}
+              >
+                <span>{topic.label}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        {/* अगर इस टॉपिक में एक से अधिक पेजेस उपलब्ध हैं, तो टैब्स दिखाएँ */}
         {topicPages.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto mb-4 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -390,7 +397,6 @@ export default function UpscPage() {
           </div>
         )}
 
-        {/* 1. WordPress Page Content Section */}
         <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
             <div>
@@ -420,7 +426,7 @@ export default function UpscPage() {
           {dataLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-slate-500">
               <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B] mb-3" />
-              <p className="text-xs font-semibold">Loading content directly from WordPress...</p>
+              <p className="text-xs font-semibold">Loading content...</p>
             </div>
           ) : !activePage ? (
             <div className="py-12 text-center text-slate-500">
@@ -448,7 +454,6 @@ export default function UpscPage() {
           )}
         </div>
 
-        {/* 2. Downloadable Notes / Chapters List */}
         <section className="w-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
@@ -502,7 +507,7 @@ export default function UpscPage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                     <Link
-                      href={`/read/${item.id}`}
+                      href={`/read/${encodeURIComponent(item.slug)}`}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
                     >
                       <Eye className="w-3.5 h-3.5" /> Read

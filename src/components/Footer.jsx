@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Mail, Send } from "lucide-react";
+import { Mail } from "lucide-react";
 
 function InstagramIcon(props) {
   return (
@@ -30,14 +30,14 @@ function FacebookIcon(props) {
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-[#111827] text-slate-300 pt-12 pb-8 border-t border-slate-800">
+    <footer className="w-full bg-[#111827] text-slate-300 pt-12 pb-8 border-t border-slate-800 mt-auto">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-slate-800">
           
           {/* Brand & About */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-700 bg-white">
+              <div className="relative w-10 h-10 rounded-full overflow-hidden border border-slate-700 bg-white shrink-0">
                 <Image
                   src="/images/logo.jpeg"
                   alt="Unique Geography Notes"
@@ -208,7 +208,7 @@ export default function Footer() {
             Designed and developed by <strong className="text-slate-400">PIXELNODE</strong>
           </span>
           <span>
-            &copy; 2026. All rights reserved by Unique Geography Notes.
+            &copy; {new Date().getFullYear()}. All rights reserved by Unique Geography Notes.
           </span>
         </div>
       </div>

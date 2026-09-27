@@ -118,7 +118,7 @@ export default function CbsePage() {
   useEffect(() => {
     async function fetchCbseWordPressData() {
       const wpUrl = (
-        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
       ).replace(/\/+$/, "");
 
       setDataLoading(true);
@@ -144,7 +144,7 @@ export default function CbsePage() {
               id: p.id,
               title: title,
               excerpt: excerpt,
-              slug: p.slug || "",
+              slug: p.slug || String(p.id),
               date: new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" }),
               corpus: `${title} ${excerpt} ${p.slug || ""}`.toLowerCase(),
             };
@@ -167,7 +167,7 @@ export default function CbsePage() {
     if (!html) return "";
 
     return html.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
       (match, domain, path) => {
         let cleanPath = path.replace(/^\/+|\/+$/g, "");
         try {
@@ -260,7 +260,7 @@ export default function CbsePage() {
     e.preventDefault();
 
     let cleanPath = href
-      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
 
@@ -290,17 +290,17 @@ export default function CbsePage() {
         contentElementId="printable-content"
       />
 
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
       {/* Board Switcher */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Board:</span>
-            <div className="inline-flex p-1 bg-white/80 rounded-xl border border-gray-300 shadow-sm gap-1">
+            <div className="inline-flex p-1 bg-white/80 rounded-xl border border-gray-300 shadow-xs gap-1">
               <Link
                 href="/category/school/cbse"
-                className="text-xs font-bold px-5 py-2 rounded-lg transition cursor-pointer bg-[#0B2545] text-white shadow"
+                className="text-xs font-bold px-5 py-2 rounded-lg transition cursor-pointer bg-[#0B2545] text-white shadow-xs"
               >
                 CBSE &amp; NCERT
               </Link>
@@ -364,7 +364,7 @@ export default function CbsePage() {
           {dataLoading ? (
             <div className="py-20 flex flex-col items-center justify-center text-slate-500">
               <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B] mb-3" />
-              <p className="text-xs font-semibold">Loading chapter outline from WordPress...</p>
+              <p className="text-xs font-semibold">Loading chapter outline...</p>
             </div>
           ) : !activeSyllabusPage ? (
             <div className="py-12 text-center text-slate-500">
@@ -444,7 +444,7 @@ export default function CbsePage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                     <Link
-                      href={`/read/${item.id}`}
+                      href={`/read/${encodeURIComponent(item.slug)}`}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
                     >
                       <Eye className="w-3.5 h-3.5" /> Read
@@ -452,7 +452,7 @@ export default function CbsePage() {
 
                     <button
                       onClick={() => openDownloadModal(item.title, item.id)}
-                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" /> Download PDF
                     </button>

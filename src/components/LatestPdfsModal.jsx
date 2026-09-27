@@ -1,64 +1,65 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Link2, X } from "lucide-react";
 
-// Exact menu list matching your screenshot
-const PORTAL_ITEMS = [
+const MODAL_BUTTON_LINKS = [
   {
-    label: "BPSC TEACHER",
-    href: "/category/exams",
-    textColor: "text-[#B91C1C]",
-    highlight: false,
+    id: 1,
+    title: "BPSC TEACHER",
+    href: "/read/%E0%A4%B8%E0%A4%BE%E0%A4%AE%E0%A4%BE%E0%A4%A8%E0%A5%8D%E0%A4%AF-%E0%A4%85%E0%A4%A7%E0%A5%8D%E0%A4%AF%E0%A4%AF%E0%A4%A8",
+    color: "bg-[#DC2626] hover:bg-[#B91C1C]", // Red
+    hasNewBadge: true,
   },
   {
-    label: "वैकल्पिक भूगोल",
-    href: "/category/upsc",
-    textColor: "text-[#7E22CE]",
-    highlight: false,
+    id: 2,
+    title: "वैकल्पिक भूगोल (UPSC / State PSC)",
+    href: "/read/%e0%a4%b5%e0%a5%88%e0%a4%95%e0%a4%b2%e0%a5%8d%e0%a4%aa%e0%a4%bf%e0%a4%95-%e0%a4%ad%e0%a5%82%e0%a4%97%e0%a5%8b%e0%a4%b2",
+    color: "bg-[#2563EB] hover:bg-[#1D4ED8]", // Blue
+    hasNewBadge: true,
   },
   {
-    label: "बिहार का भूगोल",
-    href: "/category/school/bseb",
-    textColor: "text-[#059669]",
-    highlight: false,
+    id: 3,
+    title: "बिहार का भूगोल (Geography of Bih...",
+    href: "/read/geography-of-bihar",
+    color: "bg-[#16A34A] hover:bg-[#15803D]", // Green
+    hasNewBadge: true,
   },
   {
-    label: "RESEARCH METHODOLOGY",
-    href: "/category/university",
-    textColor: "text-[#059669]",
-    highlight: true,
+    id: 4,
+    title: "RESEARCH METHODOLOGY",
+    href: "/read/research-methodology",
+    color: "bg-[#2563EB] hover:bg-[#1D4ED8]", // Blue
+    hasNewBadge: true,
   },
   {
-    label: "UGC-NET/JRF Paper2",
-    href: "/category/exams",
-    textColor: "text-[#059669]",
-    highlight: true,
+    id: 5,
+    title: "UGC-NET / JRF Paper 2 (Geogra...",
+    href: "/read/question-answer-test",
+    color: "bg-[#DC2626] hover:bg-[#B91C1C]", // Red
+    hasNewBadge: true,
   },
   {
-    label: "Remote Sensing and GIS",
-    href: "/category/university",
-    textColor: "text-[#B91C1C]",
-    highlight: false,
+    id: 6,
+    title: "Remote Sensing and GIS",
+    href: "/read/1-remote-sensing-and-gis",
+    color: "bg-[#2563EB] hover:bg-[#1D4ED8]", // Blue
+    hasNewBadge: false, // In the screenshot, this row has no NEW tag
   },
   {
-    label: "SOLVED  UGC NET/JRF AND OTHER  EXAM PAPER",
-    href: "/category/exams",
-    textColor: "text-[#059669]",
-    highlight: true,
+    id: 7,
+    title: "SOLVED UGC NET/JRF AND OTH...",
+    href: "/read/solved-exam-paper",
+    color: "bg-[#16A34A] hover:bg-[#15803D]", // Green
+    hasNewBadge: true,
   },
   {
-    label: "KVS, NVS, TGT, PGT & STET",
-    href: "/category/exams",
-    textColor: "text-[#059669]",
-    highlight: true,
-  },
-  {
-    label: "प्रेरक ज्ञान, विचार तथा कहानियाँ",
-    href: "/category/gc",
-    textColor: "text-slate-900 font-bold italic",
-    highlight: true,
-    hasPrefixBars: true,
+    id: 8,
+    title: "KVS, NVS, TGT, PGT & STET",
+    href: "/category/exams/",
+    color: "bg-[#DC2626] hover:bg-[#B91C1C]", // Red
+    hasNewBadge: true,
   },
 ];
 
@@ -67,61 +68,58 @@ export default function LatestPdfsModal({ isOpen, onClose }) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={onClose}
     >
-      <div 
-        className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-gray-200 overflow-hidden relative animate-in zoom-in-95 duration-150"
+      <div
+        className="relative w-full max-w-[340px] sm:max-w-[370px] bg-[#EEF2F6] rounded-2xl shadow-2xl overflow-hidden border border-slate-300"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-200 bg-[#F3F4F6]">
-          <h3 className="text-sm font-black text-slate-800 tracking-wide uppercase">
-            Latest PDFs &amp; Special Categories
-          </h3>
+        {/* Navy Blue Header */}
+        <div className="bg-[#1D4ED8] px-4 py-3 flex items-center justify-between text-white shadow-xs">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-blue-200" />
+            <h3 className="text-base font-black tracking-tight">
+              Other Links / Important PDFs
+            </h3>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-200 transition cursor-pointer"
+            className="p-1 hover:bg-white/20 rounded-lg transition cursor-pointer text-white"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* The Exact Vertical Stack from Image */}
-        <div className="p-5 overflow-y-auto max-h-[75vh] space-y-3.5 bg-white">
-          {PORTAL_ITEMS.map((item, index) => (
+        {/* Buttons List Container */}
+        <div className="p-3.5 space-y-2.5 max-h-[75vh] overflow-y-auto">
+          {MODAL_BUTTON_LINKS.map((btn) => (
             <Link
-              key={index}
-              href={item.href}
+              key={btn.id}
+              href={btn.href}
               onClick={onClose}
-              className="block w-full py-3 px-3 rounded border border-gray-200 bg-white hover:bg-slate-50 transition text-center shadow-2xs group"
+              className={`w-full ${btn.color} text-white font-extrabold text-[12.5px] px-3.5 py-3 rounded-xl flex items-center justify-between shadow-xs transition-transform active:scale-[0.98] cursor-pointer`}
             >
-              {item.highlight ? (
-                <span className="inline-flex items-center justify-center gap-1">
-                  {item.hasPrefixBars && (
-                    <span className="flex gap-1 mr-1.5">
-                      <span className="w-1 h-3.5 bg-[#FEF08A] rounded-xs inline-block" />
-                      <span className="w-1 h-3.5 bg-[#FEF08A] rounded-xs inline-block" />
-                    </span>
-                  )}
-                  <span className={`bg-[#FEF9C3] px-2 py-0.5 rounded text-[13px] sm:text-[14px] font-bold tracking-wide ${item.textColor}`}>
-                    {item.label}
-                  </span>
-                </span>
-              ) : (
-                <span className={`text-[13px] sm:text-[14px] font-bold tracking-wide ${item.textColor}`}>
-                  {item.label}
+              <div className="flex items-center gap-2.5 truncate pr-2">
+                <span className="text-base shrink-0 leading-none">👉</span>
+                <span className="truncate tracking-wide">{btn.title}</span>
+              </div>
+
+              {btn.hasNewBadge && (
+                <span className="bg-[#FACC15] text-amber-950 font-black text-[9px] uppercase px-1.5 py-0.5 rounded tracking-wide shrink-0 shadow-2xs">
+                  NEW
                 </span>
               )}
             </Link>
           ))}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-2.5 border-t border-gray-100 bg-[#F9FAFB] flex justify-end">
+        {/* Footer with grey Close Button */}
+        <div className="px-3.5 pb-3.5 pt-1 flex justify-end">
           <button
             onClick={onClose}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-4 py-1.5 rounded-lg transition cursor-pointer"
+            className="bg-[#DCE3EC] hover:bg-[#cbd5e1] text-slate-800 font-bold text-xs px-5 py-2 rounded-xl transition cursor-pointer shadow-2xs active:scale-95"
           >
             Close
           </button>

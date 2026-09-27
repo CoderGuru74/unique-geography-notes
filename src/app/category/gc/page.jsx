@@ -7,7 +7,7 @@ import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
-// Exactly matching the 3 original sections from the old website
+// 3 Main Sections for General Competition
 const GC_SECTIONS = [
   {
     id: "bharat-bhugol",
@@ -21,18 +21,21 @@ const GC_SECTIONS = [
       "bharat"
     ],
     keywords: ["भारत का भूगोल", "भारतीय भूगोल", "geography of india", "indian geography"],
+    bgClass: "bg-[#DC2626] hover:bg-[#B91C1C] text-white", // Crimson Red
   },
   {
-    id: "general-geography",
-    label: "General Geography",
-    enLabel: "General Geography",
+    id: "general-competition",
+    label: "2. General Competition",
+    enLabel: "General Competition",
     slugPatterns: [
+      "general-competition",
       "general-geography",
       "samanya-bhugol",
       "basic-geography",
       "physical-geography"
     ],
-    keywords: ["general geography", "सामान्य भूगोल", "भौतिक भूगोल"],
+    keywords: ["general competition", "general geography", "सामान्य भूगोल", "भौतिक भूगोल"],
+    bgClass: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white", // Royal Blue
   },
   {
     id: "samanya-adhyayan",
@@ -46,6 +49,7 @@ const GC_SECTIONS = [
       "general-competition"
     ],
     keywords: ["सामान्य अध्ययन", "general studies", "gk", "gs"],
+    bgClass: "bg-[#16A34A] hover:bg-[#15803D] text-white", // Forest Green
   },
 ];
 
@@ -89,7 +93,7 @@ export default function GCPage() {
 
     async function fetchGCWordPressData() {
       const baseDomain = (
-        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
       ).replace(/\/+$/, "");
 
       setDataLoading(true);
@@ -143,7 +147,7 @@ export default function GCPage() {
                 title: title,
                 excerpt: excerpt,
                 content: p.content?.rendered || "",
-                slug: p.slug || "",
+                slug: p.slug || String(p.id),
                 date: p.date
                   ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
                   : "",
@@ -180,7 +184,7 @@ export default function GCPage() {
     if (!html) return "";
 
     return html.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
       (match, domain, path) => {
         let cleanPath = path.replace(/^\/+|\/+$/g, "");
         try {
@@ -258,7 +262,7 @@ export default function GCPage() {
     e.preventDefault();
 
     let cleanPath = href
-      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
 
@@ -288,10 +292,8 @@ export default function GCPage() {
         contentElementId="printable-content"
       />
 
-      {/* Global Navbar */}
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
-      {/* Sub-header Banner */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -306,28 +308,30 @@ export default function GCPage() {
         </div>
       </section>
 
-      {/* The 3 Section Buttons from the Old Website */}
-      <section className="border-b border-gray-300 bg-[#DFE2E8]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3 overflow-x-auto text-[13px] font-semibold text-slate-700 py-2">
-          {GC_SECTIONS.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`py-2.5 px-5 rounded-xl whitespace-nowrap transition cursor-pointer font-bold ${
-                activeSection === section.id
-                  ? "bg-[#0B2545] text-white shadow-xs"
-                  : "bg-white/70 text-slate-800 hover:bg-white hover:text-black border border-gray-300/80"
-              }`}
-            >
-              {section.label}
-            </button>
-          ))}
+      {/* Full Solid Colored Box Buttons Strip */}
+      <section className="border-b border-gray-300 bg-[#DFE2E8] py-2.5">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2.5 overflow-x-auto text-[13px]">
+          {GC_SECTIONS.map((section) => {
+            const isSelected = activeSection === section.id;
+
+            return (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-bold text-xs sm:text-[13px] shadow-sm flex items-center gap-2 border ${section.bgClass} ${
+                  isSelected
+                    ? "ring-3 ring-amber-400 border-white scale-105"
+                    : "opacity-90 hover:opacity-100 border-black/10"
+                }`}
+              >
+                <span>{section.label}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        {/* If multiple WordPress pages exist under this section, show page tabs */}
         {sectionPages.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto mb-4 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -348,7 +352,6 @@ export default function GCPage() {
           </div>
         )}
 
-        {/* 1. Live WordPress Page Content (Only shows when client has published a page for it) */}
         {activePage && (
           <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
@@ -391,7 +394,6 @@ export default function GCPage() {
           </div>
         )}
 
-        {/* 2. Downloadable Notes List for the Selected Section */}
         <section className="w-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
@@ -399,7 +401,7 @@ export default function GCPage() {
                 {currentSectionConfig.label} — उपलब्ध नोट्स एवं PDFs
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                {filteredPosts.length} study units and PDFs ready for download.
+                High-yield static GK and exam-oriented objective notes.
               </p>
             </div>
           </div>
@@ -445,7 +447,7 @@ export default function GCPage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
                     <Link
-                      href={`/read/${item.id}`}
+                      href={`/read/${encodeURIComponent(item.slug)}`}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
                     >
                       <Eye className="w-3.5 h-3.5" /> Read

@@ -1,34 +1,67 @@
 "use client";
 
 import { useState } from "react";
+import SearchBar from "./SearchBar";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search } from "lucide-react";
 import LatestPdfsModal from "./LatestPdfsModal";
 
-export default function Navbar({ searchQuery, setSearchQuery }) {
+const NAV_ITEMS = [
+  {
+    name: "Home",
+    href: "/",
+    match: (pathname) => pathname === "/",
+    bgClass: "bg-[#0B2545] hover:bg-[#081B33] text-white", // Dark Navy
+  },
+  {
+    name: "UPSC & PSC",
+    href: "/category/upsc",
+    match: (pathname) => pathname.startsWith("/category/upsc"),
+    bgClass: "bg-[#DC2626] hover:bg-[#B91C1C] text-white", // Crimson Red
+  },
+  {
+    name: "School Notes",
+    href: "/category/school",
+    match: (pathname) => pathname.startsWith("/category/school"),
+    bgClass: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white", // Royal Blue
+  },
+  {
+    name: "Exams (CTET, UGC-NET)",
+    href: "/category/exams",
+    match: (pathname) => pathname.startsWith("/category/exams"),
+    bgClass: "bg-[#16A34A] hover:bg-[#15803D] text-white", // Forest Green
+  },
+  {
+    name: "University Notes",
+    href: "/category/university",
+    match: (pathname) => pathname.startsWith("/category/university"),
+    bgClass: "bg-[#7C3AED] hover:bg-[#6D28D9] text-white", // Deep Purple
+  },
+  {
+    name: "General Competition",
+    href: "/category/gc",
+    match: (pathname) => pathname.startsWith("/category/gc"),
+    bgClass: "bg-[#D97706] hover:bg-[#B45309] text-white", // Amber Orange
+  },
+];
+
+export default function Navbar() {
   const pathname = usePathname();
   const [latestModalOpen, setLatestModalOpen] = useState(false);
 
-  const isUniversity = pathname.startsWith("/category/university");
-  const isSchool = pathname.startsWith("/category/school");
-  const isUpsc = pathname.startsWith("/category/upsc");
-  const isExams = pathname.startsWith("/category/exams");
-  const isGc = pathname.startsWith("/category/gc");
-  const isHome = pathname === "/";
-
   return (
     <>
-      <LatestPdfsModal 
-        isOpen={latestModalOpen} 
-        onClose={() => setLatestModalOpen(false)} 
+      <LatestPdfsModal
+        isOpen={latestModalOpen}
+        onClose={() => setLatestModalOpen(false)}
       />
 
       <header className="w-full bg-[#E5E7EB]">
+        {/* Top Header Row */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 pt-5 pb-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 flex-shrink-0 bg-white shadow-xs">
+            <div className="relative w-12 h-12 rounded-full overflow-hidden border border-gray-300 shrink-0 bg-white shadow-xs">
               <Image src="/images/logo.jpeg" alt="Logo" fill sizes="48px" className="object-cover" priority />
             </div>
             <div>
@@ -39,84 +72,42 @@ export default function Navbar({ searchQuery, setSearchQuery }) {
             </div>
           </Link>
 
+          {/* Action Row */}
           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            <div className="relative w-full md:w-80">
-              <input
-                type="text"
-                placeholder="Search topic or notes..."
-                value={searchQuery || ""}
-                onChange={(e) => setSearchQuery && setSearchQuery(e.target.value)}
-                className="w-full bg-white text-xs pl-10 pr-4 py-2.5 rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#E5A83B]"
-              />
-              <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <div className="w-full md:w-80">
+              <SearchBar />
             </div>
 
             <button
               type="button"
               onClick={() => setLatestModalOpen(true)}
-              className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs px-5 py-2.5 rounded-md transition shadow-xs whitespace-nowrap cursor-pointer"
+              className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs px-5 py-2.5 rounded-lg transition shadow-xs whitespace-nowrap cursor-pointer shrink-0"
             >
-              Latest PDFs
+              Other links
             </button>
           </div>
         </div>
 
-        {/* Global Nav */}
-        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8]">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-8 overflow-x-auto text-[14px] font-medium text-slate-900">
-            <Link
-              href="/"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isHome ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              Home
-            </Link>
+        {/* Global Navigation Strip */}
+        <nav className="border-t border-b border-gray-300 bg-[#DFE2E8] py-2.5">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2.5 overflow-x-auto text-[13px]">
+            {NAV_ITEMS.map((item) => {
+              const isActive = item.match(pathname);
 
-            <Link
-              href="/category/upsc"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isUpsc ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              UPSC &amp; PSC
-            </Link>
-
-            <Link
-              href="/category/school"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isSchool ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              School Notes
-            </Link>
-
-            <Link
-              href="/category/exams"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isExams ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              Exams (CTET, UGC-NET)
-            </Link>
-
-            <Link
-              href="/category/university"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isUniversity ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              University Notes
-            </Link>
-
-            <Link
-              href="/category/gc"
-              className={`py-3 px-1 hover:text-black whitespace-nowrap transition ${
-                isGc ? "font-bold text-slate-950 border-b-2 border-[#E5A83B]" : ""
-              }`}
-            >
-              GC
-            </Link>
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 font-bold text-xs sm:text-[13px] shadow-sm flex items-center gap-2 border ${item.bgClass} ${
+                    isActive
+                      ? "ring-3 ring-amber-400 border-white scale-105"
+                      : "opacity-90 hover:opacity-100 border-black/10"
+                  }`}
+                >
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
         </nav>
       </header>

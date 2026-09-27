@@ -1,304 +1,249 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
+import Link from "next/link";
+import { Download, Loader2, GraduationCap, Home } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
-const DEGREE_TABS = [
-  { id: "ug", label: "BA / UG / B.Sc. Notes" },
-  { id: "pg", label: "MA / PG / M.Sc. Notes" },
-];
+// Strict semester resolver that isolates Semester number from Paper/Unit/CC number
+function checkStrictSemester(slug, title, targetSem, isPg = false) {
+  const targetStr = String(targetSem);
 
+  // Normalize delimiters (hyphens, brackets, dots, colons, underscores) into single spaces
+  const cleanTitle = (title || "").toLowerCase().replace(/[-_/:(),.]/g, " ");
+  const cleanSlug = (slug || "").toLowerCase().replace(/[-_/:(),.]/g, " ");
+  const combined = `${cleanSlug} ${cleanTitle}`;
+
+  // 1. If PG mode is requested, ensure post is clearly PG / MA / M.Sc
+  if (isPg) {
+    const isPgOrMa =
+      combined.includes("pg") ||
+      combined.includes("ma ") ||
+      combined.includes("m a") ||
+      cleanTitle.includes("m.a") ||
+      combined.includes("m sc") ||
+      combined.includes("post graduate") ||
+      combined.includes("स्नातकोत्तर");
+
+    if (!isPgOrMa) return false;
+  }
+
+  // 2. Identify the EXACT semester mentioned in the title/slug
+  // Higher semesters and compound Roman numerals are evaluated FIRST so IV/III/II never trigger I
+  const extractSemester = (text) => {
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?4|iv)\b/i.test(text)) return 4;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?3|iii)\b/i.test(text)) return 3;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?2|ii)\b/i.test(text)) return 2;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?1|i)\b/i.test(text)) return 1;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?5|v)\b/i.test(text)) return 5;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?6|vi)\b/i.test(text)) return 6;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?7|vii)\b/i.test(text)) return 7;
+    if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?8|viii)\b/i.test(text)) return 8;
+
+    // Check numbered list prefixes like "1. UG", "4. PG"
+    const prefixMatch = text.trim().match(/^([1-8])\s*\.\s*(?:ug|pg|ma|ba)/i);
+    if (prefixMatch) return parseInt(prefixMatch[1], 10);
+
+    return null;
+  };
+
+  const detectedSem = extractSemester(combined);
+
+  // If a semester was explicitly identified, it MUST match the target semester exactly
+  if (detectedSem !== null) {
+    return detectedSem === Number(targetStr);
+  }
+
+  // Fallback for UG Major/Minor course codes (e.g., MJC-1 = Sem 1, MJC-4 = Sem 4)
+  if (!isPg) {
+    const courseMatch = combined.match(/\b(?:mjc|mic|mdc)\s*0?([1-8])\b/i);
+    if (courseMatch) {
+      return parseInt(courseMatch[1], 10) === Number(targetStr);
+    }
+  }
+
+  return false;
+}
+
+// UG Semester definitions
 const UG_SEMESTERS = [
   {
-    id: "ug-1",
+    id: "ug-sem-1",
     label: "UG Semester-I",
-    num: 1,
-    roman: "I",
-    paperKey: "MJC-1",
-    exactSlugs: ["ug-semester-i-academic-notes", "ug-semester-1", "ug-semester-i"],
-    titleRegex: /\b(semester[-_\s]*i\b|semester[-_\s]*1\b|mjc[-_\s]*1\b)/i,
-    negativeRegex: /\b(ii|iii|iv|v|vi|vii|viii|2|3|4|5|6|7|8)\b/i,
+    color: "bg-[#DC2626] hover:bg-[#B91C1C] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 1, false),
   },
   {
-    id: "ug-2",
+    id: "ug-sem-2",
     label: "UG Semester-II",
-    num: 2,
-    roman: "II",
-    paperKey: "MJC-2",
-    exactSlugs: [
-      "ug-%e0%a4%95%e0%a4%be-%e0%a4%a8%e0%a5%8b%e0%a4%9f%e0%a5%8d%e0%a4%b8-semester-ii",
-      "ug-semester-ii-academic-notes",
-      "ug-semester-ii",
-      "ug-semester-2",
-    ],
-    titleRegex: /\b(semester[-_\s]*ii\b|semester[-_\s]*2\b|mjc[-_\s]*2\b)/i,
-    negativeRegex: /\b(iii|vii|viii|3|7|8)\b/i,
+    color: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 2, false),
   },
   {
-    id: "ug-3",
+    id: "ug-sem-3",
     label: "UG Semester-III",
-    num: 3,
-    roman: "III",
-    paperKey: "MJC-3",
-    exactSlugs: [
-      "ug-%e0%a4%95%e0%a4%be-%e0%a4%a8%e0%a5%8b%e0%a4%9f%e0%a5%8d%e0%a4%b8-semester-iii",
-      "ug-semester-iii-academic-notes",
-      "ug-semester-iii",
-      "ug-semester-3",
-    ],
-    titleRegex: /\b(semester[-_\s]*iii\b|semester[-_\s]*3\b|mjc[-_\s]*3\b)/i,
-    negativeRegex: /\b(viii|8)\b/i,
+    color: "bg-[#16A34A] hover:bg-[#15803D] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 3, false),
   },
   {
-    id: "ug-4",
+    id: "ug-sem-4",
     label: "UG Semester-IV",
-    num: 4,
-    roman: "IV",
-    paperKey: "MJC-4",
-    exactSlugs: [
-      "ug-semester-iv-academic-notes",
-      "ug-semester-iv",
-      "ug-semester-4",
-      "ba-semester-paper-iv",
-    ],
-    titleRegex: /\b(semester[-_\s]*iv\b|semester[-_\s]*4\b|mjc[-_\s]*4\b|paper[-_\s]*iv\b)/i,
-    negativeRegex: null,
+    color: "bg-[#8B5CF6] hover:bg-[#7C3AED] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 4, false),
   },
   {
-    id: "ug-5",
+    id: "ug-sem-5",
     label: "UG Semester-V",
-    num: 5,
-    roman: "V",
-    paperKey: "MJC-5",
-    exactSlugs: [
-      "ug-semester-v-academic-notes",
-      "ug-semester-v",
-      "ug-semester-5",
-      "ba-semester-paper-v",
-    ],
-    titleRegex: /\b(semester[-_\s]*v\b|semester[-_\s]*5\b|mjc[-_\s]*5\b|paper[-_\s]*v\b)/i,
-    negativeRegex: /\b(vi|vii|viii|6|7|8)\b/i,
+    color: "bg-[#D97706] hover:bg-[#B45309] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 5, false),
   },
   {
-    id: "ug-6",
+    id: "ug-sem-6",
     label: "UG Semester-VI",
-    num: 6,
-    roman: "VI",
-    paperKey: "MJC-6",
-    exactSlugs: [
-      "ug-semester-vi-academic-notes",
-      "ug-semester-vi",
-      "ug-semester-6",
-      "ba-semester-paper-vi",
-    ],
-    titleRegex: /\b(semester[-_\s]*vi\b|semester[-_\s]*6\b|mjc[-_\s]*6\b|paper[-_\s]*vi\b)/i,
-    negativeRegex: /\b(vii|viii|7|8)\b/i,
+    color: "bg-[#0284C7] hover:bg-[#0369A1] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 6, false),
   },
   {
-    id: "ug-7",
+    id: "ug-sem-7",
     label: "UG Semester-VII",
-    num: 7,
-    roman: "VII",
-    paperKey: "MJC-7",
-    exactSlugs: [
-      "ug-semester-vii-academic-notes",
-      "ug-semester-vii",
-      "ug-semester-7",
-      "ba-semester-paper-vii",
-    ],
-    titleRegex: /\b(semester[-_\s]*vii\b|semester[-_\s]*7\b|mjc[-_\s]*7\b|paper[-_\s]*vii\b)/i,
-    negativeRegex: /\b(viii|8)\b/i,
+    color: "bg-[#E11D48] hover:bg-[#BE123C] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 7, false),
   },
   {
-    id: "ug-8",
+    id: "ug-sem-8",
     label: "UG Semester-VIII",
-    num: 8,
-    roman: "VIII",
-    paperKey: "MJC-8",
-    exactSlugs: [
-      "ug-semester-viii-academic-notes",
-      "ug-semester-viii",
-      "ug-semester-8",
-      "semester-viii",
-      "semester-8",
-      "ba-semester-paper-viii",
-    ],
-    titleRegex: /\b(semester[-_\s]*viii\b|semester[-_\s]*8\b|mjc[-_\s]*8\b|paper[-_\s]*viii\b)/i,
-    negativeRegex: null,
+    color: "bg-[#0D9488] hover:bg-[#0F766E] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 8, false),
   },
   {
     id: "ug-practical",
     label: "Practical Geography",
-    num: 0,
-    roman: "PRACTICAL",
-    paperKey: "Practical",
-    exactSlugs: ["practical-geography", "practical-geography-notes", "all-practical-geography"],
-    titleRegex: /\b(practical|cartography|प्रायोगिक)\b/i,
-    negativeRegex: null,
+    color: "bg-[#475569] hover:bg-[#334155] text-white",
+    matcher: (slug, title) => {
+      const s = `${slug} ${title}`.toLowerCase();
+      return s.includes("practical") || s.includes("प्रायोगिक");
+    },
   },
 ];
 
+// PG Semester definitions
 const PG_SEMESTERS = [
   {
-    id: "pg-1",
-    label: "PG Semester-1",
-    num: 1,
-    roman: "I",
-    paperKey: "PG-1",
-    exactSlugs: ["pg-semester-i", "pg-semester-1"],
-    titleRegex: /\b(pg[-_\s]*semester[-_\s]*1\b|pg[-_\s]*semester[-_\s]*i\b)/i,
-    negativeRegex: /\b(ii|iii|iv|2|3|4)\b/i,
+    id: "pg-sem-1",
+    label: "PG Semester-I",
+    color: "bg-[#DC2626] hover:bg-[#B91C1C] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 1, true),
   },
   {
-    id: "pg-2",
-    label: "PG Semester-2",
-    num: 2,
-    roman: "II",
-    paperKey: "PG-2",
-    exactSlugs: ["pg-semester-ii", "pg-semester-2"],
-    titleRegex: /\b(pg[-_\s]*semester[-_\s]*2\b|pg[-_\s]*semester[-_\s]*ii\b)/i,
-    negativeRegex: /\b(iii|iv|3|4)\b/i,
+    id: "pg-sem-2",
+    label: "PG Semester-II",
+    color: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 2, true),
   },
   {
-    id: "pg-3",
-    label: "PG Semester-3",
-    num: 3,
-    roman: "III",
-    paperKey: "PG-3",
-    exactSlugs: [
-      "ma-%e0%a4%95%e0%a4%be-%e0%a4%a8%e0%a5%8b%e0%a4%9f%e0%a5%8d%e0%a4%b8-semester3",
-      "pg-semester-iii",
-      "pg-semester-3",
-    ],
-    titleRegex: /\b(pg[-_\s]*semester[-_\s]*3\b|pg[-_\s]*semester[-_\s]*iii\b|ma.*semester[-_\s]*3)/i,
-    negativeRegex: /\b(iv|4)\b/i,
+    id: "pg-sem-3",
+    label: "PG Semester-III",
+    color: "bg-[#16A34A] hover:bg-[#15803D] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 3, true),
   },
   {
-    id: "pg-4",
-    label: "PG Semester-4",
-    num: 4,
-    roman: "IV",
-    paperKey: "PG-4",
-    exactSlugs: ["pg-semester-iv", "pg-semester-4"],
-    titleRegex: /\b(pg[-_\s]*semester[-_\s]*4\b|pg[-_\s]*semester[-_\s]*iv\b)/i,
-    negativeRegex: null,
+    id: "pg-sem-4",
+    label: "PG Semester-IV",
+    color: "bg-[#8B5CF6] hover:bg-[#7C3AED] text-white",
+    matcher: (slug, title) => checkStrictSemester(slug, title, 4, true),
   },
 ];
 
-export default function UniversityNotesPage() {
+function decodeHtmlEntities(str) {
+  if (!str) return "";
+  return str
+    .replace(/&#8217;/g, "’")
+    .replace(/&#8216;/g, "‘")
+    .replace(/&#8220;/g, "“")
+    .replace(/&#8221;/g, "”")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'");
+}
+
+export default function UniversityCategoryPage() {
   const router = useRouter();
 
-  const [activeDegree, setActiveDegree] = useState("ug");
-  const [activeSemester, setActiveSemester] = useState("ug-1");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [level, setLevel] = useState("UG");
+  const [activeSemId, setActiveSemId] = useState("ug-sem-1");
 
   const [allPages, setAllPages] = useState([]);
-  const [allPosts, setAllPosts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalAction, setModalAction] = useState("Download Notes PDF");
+  const [modalAction, setModalAction] = useState("Download Syllabus PDF");
   const [activePostId, setActivePostId] = useState(null);
 
   const openDownloadModal = (title, postId) => {
-    setModalAction(title);
+    setModalAction(decodeHtmlEntities(title));
     setActivePostId(postId);
     setModalOpen(true);
   };
 
-  useEffect(() => {
-    if (activeDegree === "ug") {
-      setActiveSemester("ug-1");
+  const handleLevelChange = (newLevel) => {
+    setLevel(newLevel);
+    if (newLevel === "UG") {
+      setActiveSemId("ug-sem-1");
     } else {
-      setActiveSemester("pg-1");
+      setActiveSemId("pg-sem-1");
     }
-  }, [activeDegree]);
+  };
 
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchAllWordPressData() {
+    async function fetchUniversityData() {
       const baseDomain = (
-        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://www.geographynotespdf.com"
+        process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
       ).replace(/\/+$/, "");
 
       setDataLoading(true);
 
       try {
-        let pagesData = [];
-        let postsData = [];
-
-        // Fetch Pages Safely
-        try {
-          const pagesRes = await fetch(`${baseDomain}/wp-json/wp/v2/pages?per_page=100&_embed`);
-          if (pagesRes.ok) {
-            pagesData = await pagesRes.json();
+        const pagesRes = await fetch(`${baseDomain}/wp-json/wp/v2/pages?per_page=100&_embed`);
+        if (pagesRes.ok) {
+          const pagesData = await pagesRes.json();
+          if (isMounted) {
+            setAllPages(Array.isArray(pagesData) ? pagesData : []);
           }
-        } catch (e) {
-          console.warn("Could not fetch university pages:", e.message);
-        }
-
-        // Fetch Posts Safely
-        try {
-          const postsRes = await fetch(
-            `${baseDomain}/wp-json/wp/v2/posts?_fields=id,date,title,excerpt,slug,acf,_links,_embed&_embed=wp:term&per_page=100`
-          );
-          if (postsRes.ok) {
-            postsData = await postsRes.json();
-          }
-        } catch (e) {
-          console.warn("Could not fetch university posts:", e.message);
-        }
-
-        if (!isMounted) return;
-
-        setAllPages(Array.isArray(pagesData) ? pagesData : []);
-
-        if (Array.isArray(postsData)) {
-          const formattedPosts = postsData.map((p) => {
-            const title = p.title?.rendered || "";
-            const excerpt = p.excerpt?.rendered?.replace(/<[^>]+>/g, "").trim() || "";
-            return {
-              id: p.id,
-              title: title,
-              excerpt: excerpt,
-              slug: p.slug || "",
-              date: p.date
-                ? new Date(p.date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-                : "",
-              corpus: `${title} ${excerpt} ${p.slug || ""}`.toLowerCase(),
-            };
-          });
-          setAllPosts(formattedPosts);
-        } else {
-          setAllPosts([]);
         }
       } catch (err) {
-        console.error("General error in fetchAllWordPressData:", err);
+        console.error("Error loading university pages:", err);
       } finally {
         if (isMounted) setDataLoading(false);
       }
     }
 
-    fetchAllWordPressData();
+    fetchUniversityData();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const activeSemList = activeDegree === "ug" ? UG_SEMESTERS : PG_SEMESTERS;
-  const currentSemConfig = activeSemList.find((s) => s.id === activeSemester) || activeSemList[0];
+  const semesterList = level === "UG" ? UG_SEMESTERS : PG_SEMESTERS;
+  const currentSemesterConfig =
+    semesterList.find((s) => s.id === activeSemId) || semesterList[0];
 
   function cleanAndRewriteWordPressLinks(html) {
     if (!html) return "";
 
-    return html.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/([^"'#\s>]+)\/?["']/gi,
+    let cleaned = html.replace(
+      /<div[^>]*class="[^"]*(?:quiz|question-box|exam-timer)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+      ""
+    );
+
+    return cleaned.replace(
+      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
       (match, domain, path) => {
         let cleanPath = path.replace(/^\/+|\/+$/g, "");
         try {
@@ -309,89 +254,66 @@ export default function UniversityNotesPage() {
           } catch (_) {}
         }
 
-        if (cleanPath.startsWith("category/")) {
-          return `href="/${cleanPath}"`;
+        if (cleanPath.toLowerCase().endsWith(".pdf") || cleanPath.startsWith("http")) {
+          return match;
         }
-        return `href="/read/${encodeURIComponent(cleanPath)}"`;
+
+        if (cleanPath.startsWith("category/")) {
+          return `href="/${cleanPath}/"`;
+        }
+        return `href="/read/${encodeURIComponent(cleanPath)}/"`;
       }
     );
   }
 
-  const activeSyllabusPage = useMemo(() => {
+  // Exact single page matching
+  const activePage = useMemo(() => {
     if (!allPages || allPages.length === 0) return null;
 
-    const isUG = activeDegree === "ug";
-
-    for (const targetSlug of currentSemConfig.exactSlugs) {
-      const slugMatch = allPages.find((pg) => {
-        const pgSlug = (pg.slug || "").toLowerCase();
-        return pgSlug === targetSlug.toLowerCase() || decodeURIComponent(pgSlug) === decodeURIComponent(targetSlug);
-      });
-      if (slugMatch) {
-        return {
-          id: slugMatch.id,
-          title: slugMatch.title?.rendered || currentSemConfig.label,
-          content: cleanAndRewriteWordPressLinks(slugMatch.content?.rendered || ""),
-        };
-      }
-    }
-
-    const regexMatch = allPages.find((pg) => {
+    const matched = allPages.find((pg) => {
       const slug = (pg.slug || "").toLowerCase();
-      const title = (pg.title?.rendered || "").toLowerCase();
-      const textToTest = `${slug} ${title}`;
-
-      const isPostPG = slug.startsWith("pg-") || slug.startsWith("ma-") || title.includes("pg ") || title.includes("m.a");
-      if (isUG && isPostPG) return false;
-      if (!isUG && !isPostPG) return false;
-
-      const hasPositive = currentSemConfig.titleRegex.test(textToTest);
-      if (!hasPositive) return false;
-
-      if (currentSemConfig.negativeRegex && currentSemConfig.negativeRegex.test(textToTest)) {
-        return false;
-      }
-
-      return true;
+      const title = pg.title?.rendered || "";
+      return currentSemesterConfig.matcher(slug, title);
     });
 
-    if (regexMatch) {
+    if (matched) {
       return {
-        id: regexMatch.id,
-        title: regexMatch.title?.rendered || currentSemConfig.label,
-        content: cleanAndRewriteWordPressLinks(regexMatch.content?.rendered || ""),
+        id: matched.id,
+        title: matched.title?.rendered || currentSemesterConfig.label,
+        content: cleanAndRewriteWordPressLinks(matched.content?.rendered || ""),
       };
     }
 
     return null;
-  }, [allPages, currentSemConfig, activeDegree]);
+  }, [allPages, currentSemesterConfig]);
 
-  const semesterNotes = useMemo(() => {
-    if (!allPosts || allPosts.length === 0) return [];
-
-    return allPosts.filter((p) => {
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch = q === "" || p.corpus.includes(q);
-
-      const hasPositive = currentSemConfig.titleRegex.test(p.corpus);
-      const passesNegative = !currentSemConfig.negativeRegex || !currentSemConfig.negativeRegex.test(p.corpus);
-
-      const matchesSemester = hasPositive && passesNegative;
-      return matchesSearch && (matchesSemester || q !== "");
-    });
-  }, [allPosts, currentSemConfig, searchQuery]);
-
+  // Click interceptor: ensures correct browser navigation
   const handleContentClick = (e) => {
     const targetLink = e.target.closest("a");
     if (!targetLink) return;
 
-    const href = targetLink.getAttribute("href");
+    const rawHref = targetLink.getAttribute("href") || "";
+    const href = rawHref.trim();
+
     if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+
+    const isPdf = href.toLowerCase().includes(".pdf");
+    const isExternal =
+      href.startsWith("http") &&
+      !href.includes("geographynotespdf.com") &&
+      !href.includes("localhost");
+
+    if (isPdf || isExternal || href.includes("ppup.ac.in")) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
 
     e.preventDefault();
 
     let cleanPath = href
-      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?/i, "")
+      .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
 
@@ -404,11 +326,11 @@ export default function UniversityNotesPage() {
     }
 
     if (cleanPath.startsWith("category/")) {
-      router.push(`/${cleanPath}`);
+      window.location.href = `/${cleanPath}/`;
       return;
     }
 
-    router.push(`/read/${encodeURIComponent(cleanPath)}`);
+    window.location.href = `/read/${encodeURIComponent(cleanPath)}/`;
   };
 
   return (
@@ -421,85 +343,110 @@ export default function UniversityNotesPage() {
         contentElementId="printable-content"
       />
 
-      {/* Global Navbar with functional Latest PDFs modal */}
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+      <Navbar />
 
-      {/* Select Degree Level */}
+      {/* Top Banner */}
       <section className="bg-[#CFD4DC] border-b border-gray-300 py-3">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+              University Portal:
+            </span>
+            <span className="text-xs font-bold text-slate-900 bg-white/80 px-3 py-1 rounded-lg border border-gray-300 shadow-xs">
+              CBCS 4-Year B.A. Course • M.A./M.Sc. Geography • Patliputra, Magadh, PU, VKSU
+            </span>
+          </div>
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-xs font-black text-slate-800 bg-white hover:bg-slate-100 px-3 py-1 rounded-lg border border-gray-300 transition"
+          >
+            <Home className="w-3.5 h-3.5 text-amber-500" />
+            <span>Home</span>
+          </Link>
+        </div>
+      </section>
+
+      {/* Level Selection Switcher */}
+      <section className="bg-[#DFE2E8] border-b border-gray-300 py-2.5">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3">
-          <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Level:</span>
-          <div className="inline-flex p-1 bg-white/80 rounded-xl border border-gray-300 shadow-sm gap-1">
-            {DEGREE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveDegree(tab.id)}
-                className={`text-xs font-bold px-5 py-2 rounded-lg transition cursor-pointer ${
-                  activeDegree === tab.id ? "bg-[#0B2545] text-white shadow" : "text-slate-600 hover:text-black hover:bg-white"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <span className="text-xs font-black text-slate-700 uppercase tracking-wider">
+            LEVEL:
+          </span>
+          <div className="inline-flex bg-white rounded-xl p-1 border border-slate-300 shadow-xs">
+            <button
+              onClick={() => handleLevelChange("UG")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                level === "UG"
+                  ? "bg-[#0B2545] text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900"
+              }`}
+            >
+              BA / UG / B.Sc. Notes
+            </button>
+            <button
+              onClick={() => handleLevelChange("PG")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                level === "PG"
+                  ? "bg-[#0B2545] text-white shadow-xs"
+                  : "text-slate-700 hover:text-slate-900"
+              }`}
+            >
+              MA / PG / M.Sc. Notes
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Semester Horizontal Strip */}
-      <section className="border-b border-gray-300 bg-[#DFE2E8]">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-3 sm:gap-6 overflow-x-auto text-[13px] font-semibold text-slate-700">
-          {activeSemList.map((sem) => (
-            <button
-              key={sem.id}
-              onClick={() => setActiveSemester(sem.id)}
-              className={`py-3.5 px-2 whitespace-nowrap transition cursor-pointer ${
-                activeSemester === sem.id
-                  ? "border-b-2 border-[#E5A83B] text-slate-950 font-bold"
-                  : "hover:text-black"
-              }`}
-            >
-              {sem.label}
-            </button>
-          ))}
+      {/* Semester Buttons Bar */}
+      <section className="border-b border-gray-300 bg-[#E5E9EF] py-2.5">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-2 overflow-x-auto text-[13px]">
+          {semesterList.map((item) => {
+            const isSelected = activeSemId === item.id;
+
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveSemId(item.id)}
+                className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-black text-xs shadow-xs border ${item.color} ${
+                  isSelected
+                    ? "ring-3 ring-amber-400 border-white scale-105"
+                    : "opacity-90 hover:opacity-100 border-black/10"
+                }`}
+              >
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
       {/* Main Content Area */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        {/* 1. Live Syllabus Outline Section */}
-        <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
-            <div>
-              <span className="text-[11px] font-extrabold text-[#B45309] uppercase tracking-wider block">
-                Official UGC / CBCS Curriculum
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-                {currentSemConfig.label} Syllabus &amp; Topics
-              </h2>
-            </div>
-            <button
-              onClick={() => openDownloadModal(activeSyllabusPage?.title || `${currentSemConfig.label} Syllabus`, activeSyllabusPage?.id)}
-              className="bg-[#0B2545] hover:bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-xs whitespace-nowrap"
-            >
-              <Download className="w-4 h-4 text-amber-400" /> Save Full Syllabus PDF
-            </button>
+        {dataLoading ? (
+          <div className="bg-white rounded-3xl p-16 flex flex-col items-center justify-center text-slate-500 border border-gray-200">
+            <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B] mb-3" />
+            <p className="text-sm font-bold text-slate-700">Loading {currentSemesterConfig.label} notes...</p>
           </div>
+        ) : activePage ? (
+          <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
+              <div>
+                <span className="text-[11px] font-extrabold text-[#B45309] uppercase tracking-wider block">
+                  University Academic Notes &amp; Official Syllabus
+                </span>
+                <h2
+                  className="text-xl sm:text-2xl font-black text-slate-900"
+                  dangerouslySetInnerHTML={{ __html: activePage.title }}
+                />
+              </div>
+              <button
+                onClick={() => openDownloadModal(activePage.title, activePage.id)}
+                className="bg-[#0B2545] hover:bg-slate-900 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                <Download className="w-4 h-4 text-amber-400" /> Save Page PDF
+              </button>
+            </div>
 
-          {dataLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-slate-500">
-              <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B] mb-3" />
-              <p className="text-xs font-semibold">Loading syllabus from WordPress...</p>
-            </div>
-          ) : !activeSyllabusPage ? (
-            <div className="py-12 text-center text-slate-500">
-              <BookOpen className="w-10 h-10 text-amber-500/50 mb-2 mx-auto" />
-              <p className="text-xs font-bold text-slate-800">
-                Syllabus outline for {currentSemConfig.label} is currently synchronizing.
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                You can download the semester notes and study material modules directly below.
-              </p>
-            </div>
-          ) : (
             <div
               id="printable-content"
               onClick={handleContentClick}
@@ -508,83 +455,23 @@ export default function UniversityNotesPage() {
                 [&_h1]:text-xl [&_h1]:font-black [&_h1]:text-slate-900 [&_h1]:mb-3
                 [&_h2]:text-lg [&_h2]:font-extrabold [&_h2]:text-slate-900 [&_h2]:mt-5 [&_h2]:mb-2
                 [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-[#DC2626] [&_h3]:mt-4 [&_h3]:mb-1.5
-                [&_ul]:list-square [&_ul]:pl-6 [&_ul]:my-2 [&_li]:my-1.5 [&_li]:text-xs sm:[&_li]:text-sm
+                [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 [&_li]:my-1.5 [&_li]:text-xs sm:[&_li]:text-sm
+                [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2
                 [&_img]:rounded-xl [&_img]:shadow-xs [&_img]:my-3 [&_img]:mx-auto"
-              dangerouslySetInnerHTML={{ __html: activeSyllabusPage.content }}
+              dangerouslySetInnerHTML={{ __html: activePage.content }}
             />
-          )}
-        </div>
-
-        {/* 2. Downloadable Notes List */}
-        <section className="w-full">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
-            <div>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Downloadable PDF Study Material ({currentSemConfig.label})
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Offline notes, chapter summaries, and university exam solutions.
-              </p>
-            </div>
           </div>
-
-          {dataLoading ? (
-            <div className="bg-white rounded-3xl p-14 flex flex-col items-center justify-center text-slate-500 border border-gray-200">
-              <Loader2 className="w-6 h-6 animate-spin text-[#E5A83B] mb-2" />
-              <p className="text-xs font-semibold">Loading notes catalog...</p>
-            </div>
-          ) : semesterNotes.length === 0 ? (
-            <div className="bg-white/80 rounded-3xl p-12 text-center text-slate-500 border border-gray-200">
-              <FileText className="w-10 h-10 text-amber-500/50 mb-2 mx-auto" />
-              <h4 className="font-bold text-sm text-slate-800">All Topics Linked in Syllabus Above</h4>
-              <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                Tap on any topic heading in the syllabus above to view and download the note as a PDF.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {semesterNotes.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
-                >
-                  <div>
-                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
-                      {currentSemConfig.label}
-                    </span>
-
-                    <h4
-                      className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
-                    />
-
-                    {item.excerpt && (
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
-                        {item.excerpt}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      href={`/read/${item.id}`}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Read
-                    </Link>
-
-                    <button
-                      onClick={() => openDownloadModal(item.title, item.id)}
-                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        ) : (
+          <div className="bg-white rounded-3xl p-12 text-center text-slate-500 border border-gray-200">
+            <GraduationCap className="w-10 h-10 text-amber-500/50 mb-2 mx-auto" />
+            <h4 className="font-bold text-sm text-slate-800">
+              No notes found for {currentSemesterConfig.label}
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+              Please ensure a page for this semester exists in WordPress with the corresponding title or slug.
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );
