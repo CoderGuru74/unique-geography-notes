@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Download, Loader2, GraduationCap, Home } from "lucide-react";
@@ -166,7 +166,7 @@ function decodeHtmlEntities(str) {
     .replace(/&#039;/g, "'");
 }
 
-export default function UniversityCategoryPage() {
+function UniversityCategoryContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -577,5 +577,19 @@ export default function UniversityCategoryPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function UniversityCategoryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#E5E9EF] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B]" />
+        </div>
+      }
+    >
+      <UniversityCategoryContent />
+    </Suspense>
   );
 }
