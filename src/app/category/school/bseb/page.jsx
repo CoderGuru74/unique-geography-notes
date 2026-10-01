@@ -222,9 +222,19 @@ export default function BSEBPage() {
             else if (titleLower.includes("civics") || titleLower.includes("नागरिक") || titleLower.includes("polity")) subject = "Civics";
             else if (titleLower.includes("economics") || titleLower.includes("अर्थशास्त्र")) subject = "Economics";
 
+            // Clean slug to prevent double % encoding
+            let cleanSlug = p.slug || String(p.id);
+            try {
+              cleanSlug = decodeURIComponent(decodeURIComponent(cleanSlug));
+            } catch (_) {
+              try {
+                cleanSlug = decodeURIComponent(cleanSlug);
+              } catch (_) {}
+            }
+
             return {
               id: p.id,
-              slug: p.slug || String(p.id),
+              slug: cleanSlug,
               title: title,
               classNum: classNum,
               subject: subject,
@@ -651,62 +661,72 @@ export default function BSEBPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayedPosts.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-gray-200/80 flex flex-col justify-between hover:shadow-md transition"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[11px] font-extrabold px-3 py-1 rounded-md border border-amber-200">
-                      {item.badge}
-                    </span>
-                    <span className="inline-block bg-slate-100 text-slate-700 text-[11px] font-bold px-2.5 py-1 rounded-md">
-                      {item.subject}
-                    </span>
+            {displayedPosts.map((item) => {
+              // Ensure we prefer the clean slug, falling back to ID if slug is missing
+              const targetPath = item.slug ? encodeURIComponent(item.slug) : String(item.id);
+
+              return (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-3xl p-6 sm:p-7 shadow-sm border border-gray-200/80 flex flex-col justify-between hover:shadow-md transition"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[11px] font-extrabold px-3 py-1 rounded-md border border-amber-200">
+                        {item.badge}
+                      </span>
+                      <span className="inline-block bg-slate-100 text-slate-700 text-[11px] font-bold px-2.5 py-1 rounded-md">
+                        {item.subject}
+                      </span>
+                    </div>
+
+                    <Link
+                      href={`/read/${targetPath}/`}
+                      className="block hover:text-[#0B2545] transition cursor-pointer"
+                    >
+                      <h4
+                        className="font-extrabold text-base sm:text-lg text-slate-900 leading-snug mb-3 line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: item.title }}
+                      />
+                    </Link>
+
+                    {item.desc && (
+                      <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
+                        {item.desc}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium mb-6">
+                      <span className="flex items-center gap-1.5">
+                        <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                        {item.chapters}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-slate-400" />
+                        {item.pages}
+                      </span>
+                      <span className="flex items-center gap-1.5">📦 {item.size}</span>
+                    </div>
                   </div>
 
-                  <h4
-                    className="font-extrabold text-base sm:text-lg text-slate-900 leading-snug mb-3 line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
-                  />
+                  <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
+                    <Link
+                      href={`/read/${targetPath}/`}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Read Free
+                    </Link>
 
-                  {item.desc && (
-                    <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
-                      {item.desc}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-4 text-[11px] text-slate-500 font-medium mb-6">
-                    <span className="flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                      {item.chapters}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-slate-400" />
-                      {item.pages}
-                    </span>
-                    <span className="flex items-center gap-1.5">📦 {item.size}</span>
+                    <button
+                      onClick={() => openAuthPaywall(`Download ${item.title}`, item.id)}
+                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </button>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
-                  <Link
-                    href={`/read/${encodeURIComponent(item.slug)}`}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Read Free
-                  </Link>
-
-                  <button
-                    onClick={() => openAuthPaywall(`Download ${item.title}`, item.id)}
-                    className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Download, Loader2, GraduationCap, Home } from "lucide-react";
 import Navbar from "../../../components/Navbar";
@@ -11,7 +11,7 @@ import AuthModal from "../../../components/AuthModal";
 function checkStrictSemester(slug, title, targetSem, isPg = false) {
   const targetStr = String(targetSem);
 
-  // Normalize delimiters (hyphens, brackets, dots, colons, underscores) into single spaces
+  // Normalize delimiters into single spaces
   const cleanTitle = (title || "").toLowerCase().replace(/[-_/:(),.]/g, " ");
   const cleanSlug = (slug || "").toLowerCase().replace(/[-_/:(),.]/g, " ");
   const combined = `${cleanSlug} ${cleanTitle}`;
@@ -31,7 +31,6 @@ function checkStrictSemester(slug, title, targetSem, isPg = false) {
   }
 
   // 2. Identify the EXACT semester mentioned in the title/slug
-  // Higher semesters and compound Roman numerals are evaluated FIRST so IV/III/II never trigger I
   const extractSemester = (text) => {
     if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?4|iv)\b/i.test(text)) return 4;
     if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?3|iii)\b/i.test(text)) return 3;
@@ -42,7 +41,6 @@ function checkStrictSemester(slug, title, targetSem, isPg = false) {
     if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?7|vii)\b/i.test(text)) return 7;
     if (/\b(?:semester|sem|sm|सेमेस्टर)\s*(?:0?8|viii)\b/i.test(text)) return 8;
 
-    // Check numbered list prefixes like "1. UG", "4. PG"
     const prefixMatch = text.trim().match(/^([1-8])\s*\.\s*(?:ug|pg|ma|ba)/i);
     if (prefixMatch) return parseInt(prefixMatch[1], 10);
 
@@ -51,12 +49,10 @@ function checkStrictSemester(slug, title, targetSem, isPg = false) {
 
   const detectedSem = extractSemester(combined);
 
-  // If a semester was explicitly identified, it MUST match the target semester exactly
   if (detectedSem !== null) {
     return detectedSem === Number(targetStr);
   }
 
-  // Fallback for UG Major/Minor course codes (e.g., MJC-1 = Sem 1, MJC-4 = Sem 4)
   if (!isPg) {
     const courseMatch = combined.match(/\b(?:mjc|mic|mdc)\s*0?([1-8])\b/i);
     if (courseMatch) {
@@ -172,9 +168,14 @@ function decodeHtmlEntities(str) {
 
 export default function UniversityCategoryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [level, setLevel] = useState("UG");
-  const [activeSemId, setActiveSemId] = useState("ug-sem-1");
+  // Read URL query parameters so shared links open exact Level and Semester
+  const urlLevel = searchParams?.get("level")?.toUpperCase() || "UG";
+  const urlSem = searchParams?.get("sem") || (urlLevel === "PG" ? "pg-sem-1" : "ug-sem-1");
+
+  const [level, setLevel] = useState(urlLevel === "PG" ? "PG" : "UG");
+  const [activeSemId, setActiveSemId] = useState(urlSem);
 
   const [allPages, setAllPages] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -182,6 +183,28 @@ export default function UniversityCategoryPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState("Download Syllabus PDF");
   const [activePostId, setActivePostId] = useState(null);
+
+  // Keep state synchronized with URL query params
+  useEffect(() => {
+    const currentLvl = searchParams?.get("level")?.toUpperCase();
+    const currentSem = searchParams?.get("sem");
+
+    if (currentLvl === "PG" || currentLvl === "UG") {
+      setLevel(currentLvl);
+    }
+    if (currentSem) {
+      setActiveSemId(currentSem);
+    }
+  }, [searchParams]);
+
+  const updateUrlParams = (newLevel, newSem) => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("level", newLevel.toLowerCase());
+      url.searchParams.set("sem", newSem);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   const openDownloadModal = (title, postId) => {
     setModalAction(decodeHtmlEntities(title));
@@ -191,11 +214,14 @@ export default function UniversityCategoryPage() {
 
   const handleLevelChange = (newLevel) => {
     setLevel(newLevel);
-    if (newLevel === "UG") {
-      setActiveSemId("ug-sem-1");
-    } else {
-      setActiveSemId("pg-sem-1");
-    }
+    const defaultSem = newLevel === "UG" ? "ug-sem-1" : "pg-sem-1";
+    setActiveSemId(defaultSem);
+    updateUrlParams(newLevel, defaultSem);
+  };
+
+  const handleSemesterChange = (semId) => {
+    setActiveSemId(semId);
+    updateUrlParams(level, semId);
   };
 
   useEffect(() => {
@@ -237,36 +263,68 @@ export default function UniversityCategoryPage() {
   function cleanAndRewriteWordPressLinks(html) {
     if (!html) return "";
 
-    let cleaned = html.replace(
-      /<div[^>]*class="[^"]*(?:quiz|question-box|exam-timer)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
-      ""
-    );
+    const baseDomain = (
+      process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
+    ).replace(/\/+$/, "");
 
-    return cleaned.replace(
-      /href=["'](https?:\/\/(?:www\.|api\.)?geographynotespdf\.com)?\/?(?:cms\/)?([^"'#\s>]+)\/?["']/gi,
-      (match, domain, path) => {
-        let cleanPath = path.replace(/^\/+|\/+$/g, "");
-        try {
-          cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
-        } catch (_) {
-          try {
-            cleanPath = decodeURIComponent(cleanPath);
-          } catch (_) {}
-        }
+    let cleaned = html
+      .replace(
+        /<div[^>]*class="[^"]*(?:quiz|question-box|exam-timer|old-payment|payment-box|razorpay-embed-btn)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+        ""
+      )
+      .replace(
+        /<form[^>]*action="[^"]*(?:instamojo|paytm|rzp\.io|razorpay)[^"]*"[^>]*>[\s\S]*?<\/form>/gi,
+        ""
+      );
 
-        if (cleanPath.toLowerCase().endsWith(".pdf") || cleanPath.startsWith("http")) {
-          return match;
-        }
-
-        if (cleanPath.startsWith("category/")) {
-          return `href="/${cleanPath}/"`;
-        }
-        return `href="/read/${encodeURIComponent(cleanPath)}/"`;
+    return cleaned.replace(/href=["']([^"']+)["']/gi, (match, rawHref) => {
+      const href = rawHref.trim();
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return match;
       }
-    );
+
+      if (
+        href.includes("/wp-content/uploads/") ||
+        href.toLowerCase().endsWith(".pdf") ||
+        href.includes(".pdf?")
+      ) {
+        if (href.startsWith("http")) {
+          return `href="${href}" target="_blank" rel="noopener noreferrer"`;
+        }
+        const cleanUpload = href.replace(/^\/?(?:cms\/)?/, "");
+        return `href="${baseDomain}/${cleanUpload}" target="_blank" rel="noopener noreferrer"`;
+      }
+
+      if (
+        href.includes("drive.google.com") ||
+        href.includes("docs.google.com") ||
+        href.includes("mediafire.com") ||
+        (href.startsWith("http") && !href.includes("geographynotespdf.com") && !href.includes("localhost"))
+      ) {
+        return `href="${href}" target="_blank" rel="noopener noreferrer"`;
+      }
+
+      let cleanPath = href
+        .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
+        .replace(/^\/?read\//i, "")
+        .replace(/^\/+|\/+$/g, "");
+
+      try {
+        cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
+      } catch (_) {
+        try {
+          cleanPath = decodeURIComponent(cleanPath);
+        } catch (_) {}
+      }
+
+      if (cleanPath.startsWith("category/") || cleanPath.startsWith("tag/")) {
+        return `href="/${cleanPath}/"`;
+      }
+
+      return `href="/read/${encodeURIComponent(cleanPath)}/"`;
+    });
   }
 
-  // Exact single page matching
   const activePage = useMemo(() => {
     if (!allPages || allPages.length === 0) return null;
 
@@ -287,32 +345,77 @@ export default function UniversityCategoryPage() {
     return null;
   }, [allPages, currentSemesterConfig]);
 
-  // Click interceptor: ensures correct browser navigation
   const handleContentClick = (e) => {
-    const targetLink = e.target.closest("a");
+    const targetLink = e.target.closest("a, button");
     if (!targetLink) return;
 
     const rawHref = targetLink.getAttribute("href") || "";
-    const href = rawHref.trim();
+    const href = rawHref.trim().toLowerCase();
+    const text = (targetLink.innerText || "").toLowerCase();
 
-    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+    const isPaymentTrigger =
+      href.includes("rzp.io") ||
+      href.includes("instamojo") ||
+      href.includes("paytm") ||
+      href.includes("/checkout") ||
+      href.includes("payment") ||
+      targetLink.classList.contains("pay-btn") ||
+      targetLink.classList.contains("buy-now") ||
+      targetLink.classList.contains("payment-btn") ||
+      text.includes("पेमेंट") ||
+      text.includes("खरीदें") ||
+      text.includes("buy now") ||
+      text.includes("pay now") ||
+      text.includes("purchase");
 
-    const isPdf = href.toLowerCase().includes(".pdf");
+    if (isPaymentTrigger) {
+      e.preventDefault();
+      e.stopPropagation();
+      setModalOpen(true);
+      return;
+    }
+
+    if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) return;
+
+    const isPdf =
+      href.includes(".pdf") ||
+      href.includes("/wp-content/uploads/") ||
+      href.includes("drive.google.com") ||
+      href.includes("docs.google.com") ||
+      href.includes("mediafire.com");
+
     const isExternal =
-      href.startsWith("http") &&
-      !href.includes("geographynotespdf.com") &&
-      !href.includes("localhost");
+      rawHref.startsWith("http") &&
+      !rawHref.includes("geographynotespdf.com") &&
+      !rawHref.includes("localhost");
 
     if (isPdf || isExternal || href.includes("ppup.ac.in")) {
       e.preventDefault();
       e.stopPropagation();
-      window.open(href, "_blank", "noopener,noreferrer");
+
+      let targetUrl = rawHref;
+      if (rawHref.includes("/wp-content/uploads/")) {
+        const baseDomain = (
+          process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
+        ).replace(/\/+$/, "");
+
+        if (!rawHref.startsWith("http")) {
+          targetUrl = `${baseDomain}/${rawHref.replace(/^\/?(?:cms\/)?/, "")}`;
+        } else if (rawHref.includes("geographynotespdf.com/wp-content/uploads/")) {
+          targetUrl = rawHref.replace(
+            "geographynotespdf.com/wp-content/uploads/",
+            "geographynotespdf.com/cms/wp-content/uploads/"
+          );
+        }
+      }
+
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
       return;
     }
 
     e.preventDefault();
 
-    let cleanPath = href
+    let cleanPath = rawHref
       .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
       .replace(/^\/?read\//i, "")
       .replace(/^\/+|\/+$/g, "");
@@ -325,7 +428,7 @@ export default function UniversityCategoryPage() {
       } catch (_) {}
     }
 
-    if (cleanPath.startsWith("category/")) {
+    if (cleanPath.startsWith("category/") || cleanPath.startsWith("tag/")) {
       window.location.href = `/${cleanPath}/`;
       return;
     }
@@ -358,7 +461,7 @@ export default function UniversityCategoryPage() {
           </div>
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-xs font-black text-slate-800 bg-white hover:bg-slate-100 px-3 py-1 rounded-lg border border-gray-300 transition"
+            className="flex items-center gap-1.5 text-xs font-black text-slate-800 bg-white hover:bg-slate-100 px-3 py-1 rounded-lg border border-gray-300 transition cursor-pointer"
           >
             <Home className="w-3.5 h-3.5 text-amber-500" />
             <span>Home</span>
@@ -406,7 +509,7 @@ export default function UniversityCategoryPage() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSemId(item.id)}
+                onClick={() => handleSemesterChange(item.id)}
                 className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-black text-xs shadow-xs border ${item.color} ${
                   isSelected
                     ? "ring-3 ring-amber-400 border-white scale-105"

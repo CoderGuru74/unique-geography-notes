@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Download, Loader2, FileText, FileCheck, Lock, BookOpen, Mail, ShieldCheck, Heart } from "lucide-react";
+import { Download, Loader2, FileText, FileCheck, Lock, BookOpen } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
@@ -221,9 +221,9 @@ export default function ExamsPage() {
         }
 
         if (cleanPath.startsWith("category/")) {
-          return `href="/${cleanPath}"`;
+          return `href="/${cleanPath}/"`;
         }
-        return `href="/read/${encodeURIComponent(cleanPath)}"`;
+        return `href="/read/${encodeURIComponent(cleanPath)}/"`;
       }
     );
   }
@@ -299,11 +299,11 @@ export default function ExamsPage() {
     }
 
     if (cleanPath.startsWith("category/")) {
-      router.push(`/${cleanPath}`);
+      window.location.href = `/${cleanPath}/`;
       return;
     }
 
-    router.push(`/read/${encodeURIComponent(cleanPath)}`);
+    window.location.href = `/read/${encodeURIComponent(cleanPath)}/`;
   };
 
   return (
@@ -327,7 +327,7 @@ export default function ExamsPage() {
             </span>
           </div>
           <span className="text-xs font-semibold text-slate-600 bg-white/50 px-3 py-1 rounded-full border border-gray-300 hidden sm:inline">
-            Printable Question Papers &amp; Solution Keys
+            Free Online Reading • Direct PDF Download
           </span>
         </div>
       </section>
@@ -368,7 +368,7 @@ export default function ExamsPage() {
                   Official Printable Test Series &amp; Practice Sets
                 </h4>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Click <strong>&quot;Download PDF&quot;</strong> to unlock and download complete question papers with detailed answer keys.
+                  Read complete questions and answers <strong>Online for Free</strong>, or click <strong>&quot;Download PDF&quot;</strong> to get the verified printable copy.
                 </p>
               </div>
             </div>
@@ -396,7 +396,7 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* Standard Content Overview Card (Only for non-test-series syllabus categories) */}
+        {/* Standard Content Overview Card */}
         {activePage && activeExam !== "test-series" && (
           <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-gray-200 mb-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 mb-6 border-b border-gray-100 gap-3">
@@ -447,7 +447,7 @@ export default function ExamsPage() {
                 {currentExamConfig.label} — Available Test Sets &amp; Question Papers
               </h3>
               <p className="text-xs text-slate-500 font-medium">
-                Complete mock tests, practice questions, and answer keys.
+                Free online access to read, with direct PDF download available.
               </p>
             </div>
             {activeExam !== "all" && (
@@ -493,11 +493,13 @@ export default function ExamsPage() {
                       {currentExamConfig.id === "all" ? "Test Series / Notes" : currentExamConfig.label}
                     </span>
 
-                    {/* Full Heading (no truncation/line-clamp) - strictly non-clickable without payment */}
-                    <h4
-                      className="font-black text-sm sm:text-base text-slate-900 leading-snug mb-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
-                    />
+                    {/* Post Title links to free online reader */}
+                    <Link
+                      href={`/read/${encodeURIComponent(item.slug)}/`}
+                      className="block font-black text-sm sm:text-base text-slate-900 leading-snug mb-2 hover:text-[#0B2545] transition cursor-pointer"
+                    >
+                      <h4 dangerouslySetInnerHTML={{ __html: item.title }} />
+                    </Link>
 
                     {/* Short excerpt description */}
                     {item.excerpt && (
@@ -507,11 +509,19 @@ export default function ExamsPage() {
                     )}
                   </div>
 
-                  {/* Single Locked Download Button */}
-                  <div className="pt-3 border-t border-gray-100">
+                  {/* Dual Action Buttons: Read Free + Direct Paid PDF Download */}
+                  <div className="pt-3 border-t border-gray-100 flex items-center gap-2">
+                    <Link
+                      href={`/read/${encodeURIComponent(item.slug)}/`}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Read Free</span>
+                    </Link>
+
                     <button
                       onClick={() => openDownloadModal(item.title, item.id)}
-                      className="w-full bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-black text-xs py-3 rounded-xl flex items-center justify-center gap-2 shadow-xs transition cursor-pointer active:scale-[0.98]"
+                      className="flex-1 bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer active:scale-[0.98]"
                     >
                       <Lock className="w-3.5 h-3.5 text-slate-900" />
                       <Download className="w-3.5 h-3.5 text-slate-900" />
@@ -524,85 +534,6 @@ export default function ExamsPage() {
           )}
         </section>
       </div>
-
-      {/* Built-in Full Footer */}
-      <footer className="w-full bg-[#0B2545] text-slate-200 mt-auto border-t border-slate-800">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Brand Information */}
-            <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-amber-400 text-slate-950 rounded-lg">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <span className="text-base font-black text-white tracking-wide">
-                  Unique Geography Notes
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed max-w-md">
-                Complete UPSC, BPSC, UGC NET/JRF, CTET, KVS/NVS एवं विश्वविद्यालय स्तर के भूगोल अध्ययन सामग्री और टेस्ट सीरीज का प्रामाणिक मंच।
-              </p>
-              <div className="flex items-center gap-2 text-[11px] text-amber-400 font-semibold pt-1">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Verified Handwritten &amp; Digital Study Material</span>
-              </div>
-            </div>
-
-            {/* Quick Links */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                त्वरित लिंक्स
-              </h4>
-              <ul className="space-y-1.5 text-xs text-slate-300">
-                <li>
-                  <Link href="/" className="hover:text-white transition">
-                    मुख्य पृष्ठ (Home)
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/category/exams/" className="hover:text-white transition">
-                    टेस्ट सीरीज एवं मॉक टेस्ट
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/read/geography-of-bihar" className="hover:text-white transition">
-                    बिहार का भूगोल
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/read/research-methodology" className="hover:text-white transition">
-                    रिसर्च मेथोडोलॉजी
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Support / Contact */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
-                सहायता एवं संपर्क
-              </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                किसी भी सहायता, सुझाव अथवा पीडीएफ डाउनलोड समस्या के लिए संपर्क करें:
-              </p>
-              <a
-                href="mailto:support@geographynotespdf.com"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:underline pt-1"
-              >
-                <Mail className="w-3.5 h-3.5" /> support@geographynotespdf.com
-              </a>
-            </div>
-          </div>
-
-          {/* Bottom Copyright Strip */}
-          <div className="mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
-            <span>© {new Date().getFullYear()} Unique Geography Notes. All Rights Reserved.</span>
-            <span className="flex items-center gap-1 text-slate-400">
-              Made with <Heart className="w-3 h-3 text-red-500 fill-red-500" /> for Geography Aspirants
-            </span>
-          </div>
-        </div>
-      </footer>
     </main>
   );
 }

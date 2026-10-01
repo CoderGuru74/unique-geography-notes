@@ -45,33 +45,66 @@ async function fetchAllWordPressItems(endpoint) {
 }
 
 export async function generateStaticParams() {
-  const [posts, pages] = await Promise.all([
+  const [posts, pages, categories] = await Promise.all([
     fetchAllWordPressItems("posts"),
     fetchAllWordPressItems("pages"),
+    fetchAllWordPressItems("categories"),
   ]);
 
-  const allEntries = [...posts, ...pages];
+  const allEntries = [...posts, ...pages, ...categories];
   const paths = [];
   const seen = new Set();
 
+  const addPath = (rawVal) => {
+    if (!rawVal || typeof rawVal !== "string") return;
+
+    // Fully decode any pre-existing %20 or %XX so Windows filesystem never sees %25
+    let clean = rawVal.trim();
+    try {
+      clean = decodeURIComponent(decodeURIComponent(clean));
+    } catch (_) {
+      try {
+        clean = decodeURIComponent(clean);
+      } catch (_) {}
+    }
+
+    // Skip empty, invalid characters, or strings still containing literal %
+    if (!clean || clean.includes("%") || seen.has(clean)) return;
+
+    seen.add(clean);
+    paths.push({ id: clean });
+  };
+
+  // Add post/page/category slugs and IDs
   allEntries.forEach((item) => {
-    if (item.slug && !seen.has(item.slug)) {
-      seen.add(item.slug);
-      paths.push({ id: item.slug });
-    }
-    const strId = String(item.id);
-    if (strId && !seen.has(strId)) {
-      seen.add(strId);
-      paths.push({ id: strId });
-    }
+    if (item.slug) addPath(item.slug);
+    if (item.id) addPath(String(item.id));
   });
 
-  // Ensure default fallback routes exist
-  ["default", "geological-history-of-earth", "river-landforms"].forEach((fallback) => {
-    if (!seen.has(fallback)) {
-      paths.push({ id: fallback });
-    }
-  });
+  // Default routes and fallbacks without percent encoding
+  const coreFallbacks = [
+    "default",
+    "geological-history-of-earth",
+    "river-landforms",
+    "भू-आकृति-विज्ञान",
+    "जलवायु-विज्ञान",
+    "समुद्र-विज्ञान",
+    "भौगोलिक-चिंतन",
+    "राजनीतिक-भूगोल",
+    "प्रादेशिक-भूगोल",
+    "आर्थिक-भूगोल",
+    "मानव-भूगोल",
+    "ग्रामीण-एवं-नगरीय-भूगोल",
+    "पर्यावरण-भूगोल",
+    "मानचित्र-कला",
+    "जनसंख्या-भूगोल",
+    "भारत-भूगोल",
+    "बिहार-का-भूगोल",
+    "विश्व-का-भूगोल",
+    "सामान्य-भूगोल"
+  ];
+
+  coreFallbacks.forEach(addPath);
 
   return paths;
 }
