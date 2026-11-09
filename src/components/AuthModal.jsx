@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Lock, CheckCircle2, ShieldCheck, Download, Loader2, User, LogIn, UserPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Lock, CheckCircle2, ShieldCheck, Download, Loader2, User, LogIn, UserPlus, ExternalLink } from "lucide-react";
 
-const PLANS = [
+const STANDARD_PLANS = [
   {
     id: "single",
     name: "This Single PDF Note",
@@ -13,13 +14,32 @@ const PLANS = [
   },
   {
     id: "all_access",
-    name: "All-Access Portal Pass",
+    name: "All-Access Notes Pass",
     price: 49,
-    tag: "3 Years",
-    desc: "Unlimited downloads for all current & future notes and test series",
+    tag: "2 Months",
+    desc: "Unlimited downloads for all current & future PDF notes",
     featured: true,
   },
 ];
+
+const TEST_SERIES_PLANS = {
+  PAPER_1: {
+    id: "paper_1_plan",
+    name: "Paper 1 CBT Test Series Plan",
+    price: 599,
+    tag: "Paper 1 Access",
+    desc: "Complete access to Paper 1 Common General Mock Tests & Answer Keys",
+    featured: true,
+  },
+  PAPER_2: {
+    id: "paper_2_plan",
+    name: "Paper 2 CBT Test Series Plan",
+    price: 599,
+    tag: "Paper 2 Access",
+    desc: "Complete access to Paper 2 Geography Specialist Mock Tests & Solutions",
+    featured: true,
+  },
+};
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -41,16 +61,18 @@ export default function AuthModal({
   onClose,
   targetAction = "Download PDF",
   postId = null,
+  paperType = null, // "PAPER_1" | "PAPER_2" | null
   contentElementId = "printable-content",
 }) {
+  const router = useRouter();
   const [user, setUser] = useState(null);
-  
+
   // Auth Form State
-  const [authMode, setAuthMode] = useState("login"); // 'login' or 'register'
+  const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  
+
   // Plan Selection
   const [selectedPlan, setSelectedPlan] = useState("all_access");
 
@@ -58,12 +80,22 @@ export default function AuthModal({
   const [downloading, setDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const isTestSeries = paperType === "PAPER_1" || paperType === "PAPER_2";
+  const activePlans = isTestSeries
+    ? [TEST_SERIES_PLANS[paperType]]
+    : STANDARD_PLANS;
+
   useEffect(() => {
     if (isOpen) {
       loadRazorpayScript();
       setErrorMessage("");
+      if (isTestSeries && paperType && TEST_SERIES_PLANS[paperType]) {
+        setSelectedPlan(TEST_SERIES_PLANS[paperType].id);
+      } else {
+        setSelectedPlan("all_access");
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, paperType, isTestSeries]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -78,7 +110,35 @@ export default function AuthModal({
 
   if (!isOpen) return null;
 
-  const currentPlanObj = PLANS.find((p) => p.id === selectedPlan) || PLANS[1];
+  const currentPlanObj =
+    activePlans.find((p) => p.id === selectedPlan) || activePlans[0];
+
+  const handleSuccessAction = async () => {
+    // 1. If unlocking a CBT Test Series, redirect directly to the live test page
+    if (isTestSeries || paperType === "PAPER_1" || paperType === "PAPER_2") {
+      onClose();
+      if (postId) {
+        const wpUrl = (
+          process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
+        ).replace(/\/+$/, "");
+        try {
+          const res = await fetch(`${wpUrl}/wp-json/wp/v2/posts/${postId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.slug) {
+              router.push(`/read/${data.slug}/`);
+              return;
+            }
+          }
+        } catch (_) {}
+      }
+      window.location.reload();
+      return;
+    }
+
+    // 2. Otherwise execute standard PDF download
+    await triggerPdfDownload();
+  };
 
   const triggerPdfDownload = async () => {
     setDownloading(true);
@@ -99,7 +159,6 @@ export default function AuthModal({
           printTitle = postData.title?.rendered || printTitle;
           const rawContent = postData.content?.rendered || "";
 
-          // Check if post links directly to an uploaded PDF file
           const pdfMatch = rawContent.match(/href=["'](https?:\/\/[^"']+\.pdf)["']/i);
           if (pdfMatch && pdfMatch[1]) {
             const link = document.createElement("a");
@@ -185,14 +244,22 @@ export default function AuthModal({
 
   const hasAccess = () => {
     if (!user) return false;
+
+    if (paperType === "PAPER_1") {
+      return Boolean(user.purchased_paper1);
+    }
+    if (paperType === "PAPER_2") {
+      return Boolean(user.purchased_paper2);
+    }
+
     if (user.has_active_pass) return true;
     if (postId && Array.isArray(user.purchased_posts) && user.purchased_posts.includes(Number(postId))) {
       return true;
     }
+
     return false;
   };
 
-  // Handle Login or Register
   const handleAuth = async (e) => {
     e.preventDefault();
     setErrorMessage("");
@@ -207,7 +274,7 @@ export default function AuthModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode: authMode, // 'login' or 'register'
+          mode: authMode,
           email,
           password,
           name: authMode === "register" ? name : "",
@@ -223,8 +290,17 @@ export default function AuthModal({
       setUser(data.user);
       localStorage.setItem("notes_user", JSON.stringify(data.user));
 
-      if (data.user.has_active_pass || (postId && data.user.purchased_posts?.includes(Number(postId)))) {
-        await triggerPdfDownload();
+      let userHasAccess = false;
+      if (paperType === "PAPER_1") {
+        userHasAccess = Boolean(data.user.purchased_paper1);
+      } else if (paperType === "PAPER_2") {
+        userHasAccess = Boolean(data.user.purchased_paper2);
+      } else {
+        userHasAccess = data.user.has_active_pass || (postId && data.user.purchased_posts?.includes(Number(postId)));
+      }
+
+      if (userHasAccess) {
+        await handleSuccessAction();
       }
     } catch (err) {
       setErrorMessage(err.message || "Authentication failed. Please check your credentials.");
@@ -248,71 +324,70 @@ export default function AuthModal({
       process.env.NEXT_PUBLIC_WORDPRESS_URL || "https://geographynotespdf.com/cms"
     ).replace(/\/+$/, "");
 
-    try {
-      const orderRes = await fetch(`${wpUrl}/wp-json/notes-api/v1/create-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: currentPlanObj.price * 100, // in paise
-          userId: user?.id,
-        }),
-      });
+    const activeKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_TnKpUrsGRWE0Q6";
+    const isTestKey = activeKey.startsWith("rzp_test_");
 
-      const orderData = await orderRes.json();
-      if (!orderData.success || !orderData.order_id) {
-        throw new Error(orderData.message || "Could not initialize payment order");
+    try {
+      let orderId = null;
+
+      if (!isTestKey) {
+        try {
+          const orderRes = await fetch(`${wpUrl}/wp-json/notes-api/v1/create-order`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount: currentPlanObj.price * 100,
+              userId: user?.id,
+              paperType: paperType,
+            }),
+          });
+
+          const orderData = await orderRes.json();
+          if (orderData.success && orderData.order_id) {
+            orderId = orderData.order_id;
+          }
+        } catch (e) {
+          console.warn("Server order creation skipped or failed:", e);
+        }
       }
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_TgdBiGOY6iigmU",
-        amount: orderData.amount,
+        key: activeKey,
+        amount: currentPlanObj.price * 100,
         currency: "INR",
         name: "Unique Geography Notes",
         description: `${currentPlanObj.name} (Access Pass)`,
-        order_id: orderData.order_id,
         prefill: {
-          name: user?.name || "",
-          email: user?.email || "",
+          name: user?.name || "Student",
+          email: user?.email || "student@gmail.com",
         },
         theme: {
           color: "#0B2545",
         },
         handler: async function (response) {
           try {
-            const verifyRes = await fetch(`${wpUrl}/wp-json/notes-api/v1/verify-payment`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                userId: user?.id,
-                planId: currentPlanObj.id,
-                postId: postId,
-              }),
-            });
+            const updatedUser = {
+              ...user,
+              has_active_pass: currentPlanObj.id === "all_access" ? true : user?.has_active_pass,
+              purchased_paper1: paperType === "PAPER_1" ? true : user?.purchased_paper1,
+              purchased_paper2: paperType === "PAPER_2" ? true : user?.purchased_paper2,
+              purchased_posts: postId
+                ? [...(user?.purchased_posts || []), Number(postId)]
+                : user?.purchased_posts,
+            };
 
-            const verifyData = await verifyRes.json();
-            if (verifyData.success) {
-              const updatedUser = {
-                ...user,
-                has_active_pass: currentPlanObj.id === "all_access" ? true : user?.has_active_pass,
-                purchased_posts: postId
-                  ? [...(user?.purchased_posts || []), Number(postId)]
-                  : user?.purchased_posts,
-              };
-              setUser(updatedUser);
-              localStorage.setItem("notes_user", JSON.stringify(updatedUser));
-
-              await triggerPdfDownload();
-            } else {
-              setErrorMessage("Payment verification failed. Please contact support.");
-            }
+            setUser(updatedUser);
+            localStorage.setItem("notes_user", JSON.stringify(updatedUser));
+            await handleSuccessAction();
           } catch (err) {
-            setErrorMessage("Error verifying payment.");
+            setErrorMessage("Error unlocking plan after payment.");
           }
         },
       };
+
+      if (orderId) {
+        options.order_id = orderId;
+      }
 
       const rzp = new window.Razorpay(options);
       rzp.open();
@@ -335,7 +410,9 @@ export default function AuthModal({
         <div className="bg-[#0B2545] p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-amber-400" />
-            <h3 className="text-base font-black tracking-tight">Unlock PDF Notes</h3>
+            <h3 className="text-base font-black tracking-tight">
+              {isTestSeries ? `Unlock ${paperType === "PAPER_2" ? "Paper 2" : "Paper 1"} Test Series` : "Unlock PDF Notes"}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -347,11 +424,25 @@ export default function AuthModal({
 
         {/* Modal Body */}
         <div className="p-6">
-          <div className="mb-4">
-            <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block">
-              Item Requested:
-            </span>
-            <p className="text-xs font-bold text-slate-800 line-clamp-1">{targetAction}</p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 block">
+                Item Requested:
+              </span>
+              <p className="text-xs font-bold text-slate-800 line-clamp-1">{targetAction}</p>
+            </div>
+            {user && (
+              <button
+                onClick={() => {
+                  onClose();
+                  router.push("/dashboard");
+                }}
+                className="text-[11px] font-black text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <span>My Dashboard</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
           {errorMessage && (
@@ -360,10 +451,9 @@ export default function AuthModal({
             </div>
           )}
 
-          {/* SCREEN 1: Not Logged In -> Show Login vs Register Tabs */}
+          {/* SCREEN 1: Not Logged In */}
           {!user ? (
             <div>
-              {/* Tabs Switcher */}
               <div className="flex items-center bg-slate-100 p-1 rounded-xl mb-4 border border-gray-200">
                 <button
                   type="button"
@@ -451,7 +541,6 @@ export default function AuthModal({
                 </button>
               </form>
 
-              {/* Bottom helper toggle text */}
               <div className="text-center mt-3 pt-2 border-t border-gray-100">
                 {authMode === "login" ? (
                   <p className="text-xs text-slate-500">
@@ -479,29 +568,37 @@ export default function AuthModal({
               </div>
             </div>
           ) : hasAccess() ? (
-            // SCREEN 2: Logged In & Already Has Access
+            // SCREEN 2: Has Valid Access
             <div className="text-center py-4 space-y-3">
               <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-              <h4 className="text-sm font-black text-slate-900">Access Pass Active</h4>
+              <h4 className="text-sm font-black text-slate-900">
+                {isTestSeries ? "Test Series Plan Unlocked" : "Notes Access Pass Active"}
+              </h4>
               <p className="text-xs text-slate-500">
-                You have active access! Click below to download your complete paper.
+                {isTestSeries
+                  ? "Your test series plan is active! Click below to start your live test."
+                  : "You have active access! Click below to download your complete paper."}
               </p>
               <button
-                onClick={triggerPdfDownload}
+                onClick={handleSuccessAction}
                 disabled={downloading}
                 className="w-full bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-black text-xs py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
               >
                 {downloading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isTestSeries ? (
+                  <>
+                    <ExternalLink className="w-4 h-4" /> Start Live CBT Test
+                  </>
                 ) : (
                   <>
-                    <Download className="w-4 h-4" /> Download PDF Now
+                    <Download className="w-4 h-4" /> Download PDF Notes
                   </>
                 )}
               </button>
             </div>
           ) : (
-            // SCREEN 3: Logged In -> Select Plan and Pay
+            // SCREEN 3: Logged In -> Select Required Plan
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs pb-2 border-b border-gray-100">
                 <span className="text-slate-600 flex items-center gap-1.5 font-medium">
@@ -516,10 +613,10 @@ export default function AuthModal({
                 </button>
               </div>
 
-              <p className="text-xs font-bold text-slate-700">Choose Your Access Plan:</p>
+              <p className="text-xs font-bold text-slate-700">Choose Access Plan:</p>
 
               <div className="space-y-2.5">
-                {PLANS.map((plan) => (
+                {activePlans.map((plan) => (
                   <div
                     key={plan.id}
                     onClick={() => setSelectedPlan(plan.id)}
@@ -542,7 +639,7 @@ export default function AuthModal({
                           <span className="text-xs font-black text-slate-900">{plan.name}</span>
                           {plan.featured && (
                             <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded">
-                              BEST VALUE
+                              REQUIRED
                             </span>
                           )}
                         </div>
@@ -569,7 +666,7 @@ export default function AuthModal({
 
               <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 pt-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Secured by Razorpay • Instant Download</span>
+                <span>Secured by Razorpay • Instant Unlock</span>
               </div>
             </div>
           )}

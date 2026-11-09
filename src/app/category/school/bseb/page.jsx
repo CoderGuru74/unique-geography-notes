@@ -17,6 +17,15 @@ import {
 import Navbar from "../../../../components/Navbar";
 import AuthModal from "../../../../components/AuthModal";
 
+// Helper function to sanitize WordPress slugs and prevent double-prefixing (/read/read%2Fslug)
+const sanitizeSlug = (rawSlug) => {
+  if (!rawSlug) return "";
+  return String(rawSlug)
+    .replace(/^https?:\/\/[^\/]+/, "") // Remove domain if present
+    .replace(/^\/?read\//i, "")        // Remove leading "read/" or "/read/"
+    .replace(/^\/+|\/+$/g, "");        // Trim leading & trailing slashes
+};
+
 const LOWER_SECONDARY = [
   { grade: "6", title: "BSEB Class 6 Social Science", sub: "Social Science • History • Geography • Civics", color: "bg-[#E0F2FE] text-[#0369A1]", slug: "bseb-class-6" },
   { grade: "7", title: "BSEB Class 7 Social Science", sub: "Social Science • History • Geography • Political Science", color: "bg-[#FEF3C7] text-[#B45309]", slug: "bseb-class-7" },
@@ -223,14 +232,16 @@ export default function BSEBPage() {
             else if (titleLower.includes("economics") || titleLower.includes("अर्थशास्त्र")) subject = "Economics";
 
             // Clean slug to prevent double % encoding
-            let cleanSlug = p.slug || String(p.id);
+            let rawSlug = p.slug || String(p.id);
             try {
-              cleanSlug = decodeURIComponent(decodeURIComponent(cleanSlug));
+              rawSlug = decodeURIComponent(decodeURIComponent(rawSlug));
             } catch (_) {
               try {
-                cleanSlug = decodeURIComponent(cleanSlug);
+                rawSlug = decodeURIComponent(rawSlug);
               } catch (_) {}
             }
+
+            const cleanSlug = sanitizeSlug(rawSlug);
 
             return {
               id: p.id,
@@ -662,8 +673,7 @@ export default function BSEBPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayedPosts.map((item) => {
-              // Ensure we prefer the clean slug, falling back to ID if slug is missing
-              const targetPath = item.slug ? encodeURIComponent(item.slug) : String(item.id);
+              const cleanSlug = item.slug ? sanitizeSlug(item.slug) : String(item.id);
 
               return (
                 <div
@@ -681,7 +691,8 @@ export default function BSEBPage() {
                     </div>
 
                     <Link
-                      href={`/read/${targetPath}/`}
+                      href={`/read/${cleanSlug}/`}
+                      prefetch={false}
                       className="block hover:text-[#0B2545] transition cursor-pointer"
                     >
                       <h4
@@ -711,7 +722,8 @@ export default function BSEBPage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
                     <Link
-                      href={`/read/${targetPath}/`}
+                      href={`/read/${cleanSlug}/`}
+                      prefetch={false}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" /> Read Free

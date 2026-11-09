@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
+
+// Helper function to sanitize WordPress slugs and prevent double-prefixing (/read/read%2Fslug)
+const sanitizeSlug = (rawSlug) => {
+  if (!rawSlug) return "";
+  return String(rawSlug)
+    .replace(/^https?:\/\/[^\/]+/, "") // Remove domain if present
+    .replace(/^\/?read\//i, "")        // Remove leading "read/" or "/read/"
+    .replace(/^\/+|\/+$/g, "");        // Trim leading & trailing slashes
+};
 
 const UPSC_TOPICS = [
   {
@@ -121,15 +130,23 @@ const UPSC_TOPICS = [
   },
 ];
 
-export default function UpscPage() {
+function UpscPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [activeTopic, setActiveTopic] = useState("geomorphology");
+  // Retrieve topic and page index directly from URL search query parameters
+  const topicParam = searchParams.get("topic");
+  const pageParam = searchParams.get("page");
+
+  const activeTopic = topicParam && UPSC_TOPICS.some((t) => t.id === topicParam)
+    ? topicParam
+    : "geomorphology";
+
+  const selectedPageIndex = pageParam ? Math.max(0, parseInt(pageParam, 10) || 0) : 0;
+
   const [allPages, setAllPages] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
-
-  const [selectedPageIndex, setSelectedPageIndex] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalAction, setModalAction] = useState("Download Notes PDF");
@@ -139,6 +156,21 @@ export default function UpscPage() {
     setModalAction(title);
     setActivePostId(postId);
     setModalOpen(true);
+  };
+
+  // Switch Topic Tab and persist choice to URL query parameter
+  const handleTopicChange = (topicId) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("topic", topicId);
+    params.delete("page"); // Reset page index when switching topics
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+
+  // Switch Sub-page Index and persist to URL query parameter
+  const handlePageChange = (idx) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", String(idx));
+    router.push(`?${params.toString()}`, { scroll: false });
   };
 
   useEffect(() => {
@@ -215,10 +247,6 @@ export default function UpscPage() {
 
   const currentTopicConfig = UPSC_TOPICS.find((t) => t.id === activeTopic) || UPSC_TOPICS[1];
 
-  useEffect(() => {
-    setSelectedPageIndex(0);
-  }, [activeTopic]);
-
   function cleanAndRewriteWordPressLinks(html) {
     if (!html) return "";
 
@@ -234,10 +262,12 @@ export default function UpscPage() {
           } catch (_) {}
         }
 
+        cleanPath = sanitizeSlug(cleanPath);
+
         if (cleanPath.startsWith("category/")) {
-          return `href="/${cleanPath}"`;
+          return `href="/${cleanPath}/"`;
         }
-        return `href="/read/${encodeURIComponent(cleanPath)}"`;
+        return `href="/read/${cleanPath}/"`;
       }
     );
   }
@@ -308,8 +338,7 @@ export default function UpscPage() {
 
     let cleanPath = href
       .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
-      .replace(/^\/?read\//i, "")
-      .replace(/^\/+|\/+$/g, "");
+      .replace(/^\/?read\//i, "");
 
     try {
       cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
@@ -319,12 +348,14 @@ export default function UpscPage() {
       } catch (_) {}
     }
 
+    cleanPath = sanitizeSlug(cleanPath);
+
     if (cleanPath.startsWith("category/")) {
-      router.push(`/${cleanPath}`);
+      router.push(`/${cleanPath}/`);
       return;
     }
 
-    router.push(`/read/${encodeURIComponent(cleanPath)}`);
+    router.push(`/read/${cleanPath}/`);
   };
 
   return (
@@ -362,7 +393,7 @@ export default function UpscPage() {
             return (
               <button
                 key={topic.id}
-                onClick={() => setActiveTopic(topic.id)}
+                onClick={() => handleTopicChange(topic.id)}
                 className={`px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-150 cursor-pointer font-bold text-xs sm:text-[13px] shadow-sm flex items-center gap-2 border ${topic.bgClass} ${
                   isSelected
                     ? "ring-3 ring-amber-400 border-white scale-105"
@@ -385,7 +416,7 @@ export default function UpscPage() {
             {topicPages.map((pg, idx) => (
               <button
                 key={pg.id}
-                onClick={() => setSelectedPageIndex(idx)}
+                onClick={() => handlePageChange(idx)}
                 className={`text-xs px-3.5 py-1.5 rounded-lg font-bold border transition cursor-pointer whitespace-nowrap ${
                   selectedPageIndex === idx
                     ? "bg-[#E5A83B] text-slate-950 border-amber-400 shadow-xs"
@@ -483,49 +514,68 @@ export default function UpscPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredPosts.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
-                >
-                  <div>
-                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
-                      UPSC / PSC Optional
-                    </span>
+              {filteredPosts.map((item) => {
+                const cleanSlug = sanitizeSlug(item.slug);
 
-                    <h4
-                      className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
-                    />
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
+                  >
+                    <div>
+                      <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
+                        UPSC / PSC Optional
+                      </span>
 
-                    {item.excerpt && (
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
-                        {item.excerpt}
-                      </p>
-                    )}
+                      <h4
+                        className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: item.title }}
+                      />
+
+                      {item.excerpt && (
+                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                          {item.excerpt}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                      <Link
+                        href={`/read/${cleanSlug}/`}
+                        prefetch={false}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Read
+                      </Link>
+
+                      <button
+                        onClick={() => openDownloadModal(item.title, item.id)}
+                        className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Download PDF
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      href={`/read/${encodeURIComponent(item.slug)}`}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Read
-                    </Link>
-
-                    <button
-                      onClick={() => openDownloadModal(item.title, item.id)}
-                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
       </div>
     </main>
+  );
+}
+
+export default function UpscPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#E5E9EF] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#E5A83B]" />
+        </div>
+      }
+    >
+      <UpscPageContent />
+    </Suspense>
   );
 }

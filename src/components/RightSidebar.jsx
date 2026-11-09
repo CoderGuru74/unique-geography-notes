@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Clock, Loader2 } from "lucide-react";
 
+// Helper function to sanitize WordPress slugs and prevent double-prefixing (/read/read%2Fslug)
+const sanitizeSlug = (rawSlug) => {
+  if (!rawSlug) return "";
+  return String(rawSlug)
+    .replace(/^https?:\/\/[^\/]+/, "") // Remove domain if present
+    .replace(/^\/?read\//, "")         // Remove leading "read/" or "/read/"
+    .replace(/^\/+|\/+$/g, "");        // Trim leading & trailing slashes
+};
+
 // Exact menu portals matching the original WordPress website
 const SIDEBAR_PORTALS = [
   { label: "BPSC TEACHER", href: "/category/exams", color: "text-[#B91C1C]" },
@@ -103,11 +112,14 @@ export default function RightSidebar() {
         ) : (
           <div className="divide-y divide-gray-100">
             {recentPosts.map((post, index) => {
-              const cleanSlug = post.slug || String(post.id);
+              const rawSlug = post.slug || String(post.id);
+              const cleanSlug = sanitizeSlug(rawSlug);
+
               return (
                 <Link
                   key={post.id}
-                  href={`/read/${encodeURIComponent(cleanSlug)}`}
+                  href={`/read/${cleanSlug}/`}
+                  prefetch={false}
                   className="block py-3 hover:text-blue-600 group transition"
                 >
                   <p

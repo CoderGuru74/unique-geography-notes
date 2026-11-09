@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+      {
+        "source": "read/**",
+        "destination": "/read/default/index.html"
+      },
+      {
+        "source": "category/**",
+        "destination": "/index.html"
+      }
+    ]
+  }

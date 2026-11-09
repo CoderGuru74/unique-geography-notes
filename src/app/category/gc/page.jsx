@@ -7,6 +7,15 @@ import { BookOpen, Eye, Download, Loader2, FileText } from "lucide-react";
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
+// Helper function to sanitize WordPress slugs and prevent double-prefixing (/read/read%2Fslug)
+const sanitizeSlug = (rawSlug) => {
+  if (!rawSlug) return "";
+  return String(rawSlug)
+    .replace(/^https?:\/\/[^\/]+/, "") // Remove domain if present
+    .replace(/^\/?read\//i, "")        // Remove leading "read/" or "/read/"
+    .replace(/^\/+|\/+$/g, "");        // Trim leading & trailing slashes
+};
+
 // 3 Main Sections for General Competition
 const GC_SECTIONS = [
   {
@@ -195,10 +204,12 @@ export default function GCPage() {
           } catch (_) {}
         }
 
+        cleanPath = sanitizeSlug(cleanPath);
+
         if (cleanPath.startsWith("category/")) {
-          return `href="/${cleanPath}"`;
+          return `href="/${cleanPath}/"`;
         }
-        return `href="/read/${encodeURIComponent(cleanPath)}"`;
+        return `href="/read/${cleanPath}/"`;
       }
     );
   }
@@ -263,8 +274,7 @@ export default function GCPage() {
 
     let cleanPath = href
       .replace(/^https?:\/\/(?:www\.|api\.)?geographynotespdf\.com\/?(?:cms\/)?/i, "")
-      .replace(/^\/?read\//i, "")
-      .replace(/^\/+|\/+$/g, "");
+      .replace(/^\/?read\//i, "");
 
     try {
       cleanPath = decodeURIComponent(decodeURIComponent(cleanPath));
@@ -274,12 +284,14 @@ export default function GCPage() {
       } catch (_) {}
     }
 
+    cleanPath = sanitizeSlug(cleanPath);
+
     if (cleanPath.startsWith("category/")) {
-      router.push(`/${cleanPath}`);
+      router.push(`/${cleanPath}/`);
       return;
     }
 
-    router.push(`/read/${encodeURIComponent(cleanPath)}`);
+    router.push(`/read/${cleanPath}/`);
   };
 
   return (
@@ -423,45 +435,50 @@ export default function GCPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredPosts.map((item) => (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
-                >
-                  <div>
-                    <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
-                      {currentSectionConfig.label}
-                    </span>
+              {filteredPosts.map((item) => {
+                const cleanSlug = sanitizeSlug(item.slug);
 
-                    <h4
-                      className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
-                    />
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
+                  >
+                    <div>
+                      <span className="inline-block bg-[#FEF3C7] text-[#B45309] text-[10px] font-extrabold px-2.5 py-0.5 rounded mb-2 border border-amber-200">
+                        {currentSectionConfig.label}
+                      </span>
 
-                    {item.excerpt && (
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
-                        {item.excerpt}
-                      </p>
-                    )}
+                      <h4
+                        className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug mb-2 line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: item.title }}
+                      />
+
+                      {item.excerpt && (
+                        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-4">
+                          {item.excerpt}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
+                      <Link
+                        href={`/read/${cleanSlug}/`}
+                        prefetch={false}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Read
+                      </Link>
+
+                      <button
+                        onClick={() => openDownloadModal(item.title, item.id)}
+                        className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Download PDF
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                    <Link
-                      href={`/read/${encodeURIComponent(item.slug)}`}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Read
-                    </Link>
-
-                    <button
-                      onClick={() => openDownloadModal(item.title, item.id)}
-                      className="bg-[#E5A83B] hover:bg-[#d49425] text-slate-950 font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Download PDF
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
