@@ -346,6 +346,10 @@ export default function ReaderClient({ rawId }) {
   useEffect(() => {
     if (!resolvedSlug) return;
 
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
+
     let isMounted = true;
 
     async function fetchContent() {
@@ -624,6 +628,9 @@ export default function ReaderClient({ rawId }) {
 
     setResolvedSlug(cleanPath);
     window.history.pushState({}, "", `/read/${cleanPath}/`);
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
   };
 
   const title = post?.title?.rendered
