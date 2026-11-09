@@ -21,13 +21,12 @@ import {
 import Navbar from "../../../components/Navbar";
 import AuthModal from "../../../components/AuthModal";
 
-// Helper function to sanitize WordPress slugs and prevent double-prefixing (/read/read%2Fslug)
 const sanitizeSlug = (rawSlug) => {
   if (!rawSlug) return "";
   return String(rawSlug)
-    .replace(/^https?:\/\/[^\/]+/, "") // Remove domain if present
-    .replace(/^\/?read\//i, "")        // Remove leading "read/" or "/read/"
-    .replace(/^\/+|\/+$/g, "");        // Trim leading & trailing slashes
+    .replace(/^https?:\/\/[^\/]+/, "")
+    .replace(/^\/?read\//i, "")
+    .replace(/^\/+|\/+$/g, "");
 };
 
 const EXAM_CATEGORIES = [
@@ -126,12 +125,11 @@ export default function ExamsPage() {
   const router = useRouter();
 
   const [activeExam, setActiveExam] = useState("all");
-  const [paperFilter, setPaperFilter] = useState("ALL"); // ALL | PAPER_1 | PAPER_2
+  const [paperFilter, setPaperFilter] = useState("ALL");
   const [allPages, setAllPages] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // Student Profile & Purchases State
   const [user, setUser] = useState(null);
 
   const [selectedPageIndex, setSelectedPageIndex] = useState(0);
@@ -141,7 +139,6 @@ export default function ExamsPage() {
   const [activePostId, setActivePostId] = useState(null);
   const [activePaperType, setActivePaperType] = useState(null);
 
-  // Sync user profile on mount and on modal toggle
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedUser = localStorage.getItem("notes_user");
@@ -212,7 +209,7 @@ export default function ExamsPage() {
             const titleLower = title.toLowerCase();
             const slugLower = (p.slug || "").toLowerCase();
 
-            // Broad check for CBT Test fields or phrases
+            // Check for ACF questions
             const hasAcfQuestions = Boolean(
               p.acf?.q1_question ||
               p.acf?.quiz_json ||
@@ -239,7 +236,16 @@ export default function ExamsPage() {
               slugLower.includes("practice-set") ||
               slugLower.includes("set1");
 
-            const isTest = hasAcfQuestions || hasExplicitMockTestPhrase;
+            // Exclude PPU / University semester question papers from CBT Test status
+            const isUniversityPastPaper =
+              titleLower.includes("ppu") ||
+              titleLower.includes("semester") ||
+              titleLower.includes("regular examination") ||
+              titleLower.includes("mic-4") ||
+              titleLower.includes("mjc-5") ||
+              titleLower.includes("question paper 202");
+
+            const isTest = (hasAcfQuestions || hasExplicitMockTestPhrase) && !isUniversityPastPaper;
 
             // Detect Paper Type
             let paperType = "PAPER_1";
@@ -353,12 +359,11 @@ export default function ExamsPage() {
 
   const activePage = examPages[selectedPageIndex] || examPages[0] || null;
 
-  // Filtered Posts Logic
   const filteredPosts = useMemo(() => {
     if (!allPosts || allPosts.length === 0) return [];
 
     return allPosts.filter((p) => {
-      // 1. Under "सभी परीक्षा नोट्स (All Exams)", ONLY show regular theory notes (EXCLUDE CBT tests)
+      // 1. Under "सभी परीक्षा नोट्स (All Exams)", ONLY show regular theory notes
       if (activeExam === "all" && paperFilter === "ALL") {
         if (p.isTest) return false;
       }
@@ -414,7 +419,6 @@ export default function ExamsPage() {
             </span>
           </div>
 
-          {/* Student Account Status Trigger */}
           <div className="flex items-center gap-3">
             {user ? (
               <button
@@ -487,7 +491,7 @@ export default function ExamsPage() {
       </section>
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8 py-8 w-full flex-1">
-        {/* Paper 1 vs Paper 2 Plan Information Box */}
+        {/* Plan Information Box */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm mb-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-2 max-w-2xl">
@@ -558,7 +562,6 @@ export default function ExamsPage() {
           </div>
         </div>
 
-        {/* Page Switcher Tabs if multiple pages exist */}
         {examPages.length > 1 && (
           <div className="flex items-center gap-2 overflow-x-auto mb-4 pb-2">
             <span className="text-xs font-black text-slate-600 uppercase tracking-wider whitespace-nowrap">
@@ -579,7 +582,6 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* Selected Page Overview Content */}
         {activePage && (
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm mb-8">
             <h3
@@ -593,7 +595,6 @@ export default function ExamsPage() {
           </div>
         )}
 
-        {/* Available Content Grid */}
         <section className="w-full">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-2">
             <div>
@@ -641,7 +642,6 @@ export default function ExamsPage() {
                 const isPaper2 = item.paperType === "PAPER_2";
                 const cleanSlug = sanitizeSlug(item.slug);
 
-                // Access check
                 const isTestUnlocked = user
                   ? isPaper2
                     ? Boolean(user.purchased_paper2)
@@ -654,7 +654,6 @@ export default function ExamsPage() {
                     className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition"
                   >
                     <div>
-                      {/* Header Badge */}
                       <div className="flex items-center justify-between mb-3">
                         {item.isTest ? (
                           <span
@@ -689,13 +688,11 @@ export default function ExamsPage() {
                         )}
                       </div>
 
-                      {/* Title */}
                       <h4
                         className="font-black text-sm sm:text-base text-slate-900 leading-snug mb-2"
                         dangerouslySetInnerHTML={{ __html: item.title }}
                       />
 
-                      {/* Excerpt */}
                       {item.excerpt && (
                         <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed mb-4">
                           {item.excerpt}
@@ -703,10 +700,8 @@ export default function ExamsPage() {
                       )}
                     </div>
 
-                    {/* Action Buttons */}
                     <div className="pt-3 border-t border-gray-100">
                       {item.isTest ? (
-                        /* CBT TEST SERIES BUTTONS */
                         isTestUnlocked ? (
                           <Link
                             href={`/read/${cleanSlug}/`}
@@ -728,7 +723,6 @@ export default function ExamsPage() {
                           </button>
                         )
                       ) : (
-                        /* STANDARD THEORY NOTES BUTTONS */
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/read/${cleanSlug}/`}
