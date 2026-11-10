@@ -436,7 +436,7 @@ export default function ReaderClient({ rawId }) {
             const extractedQuestions = [];
 
             if (acfData) {
-              for (let i = 1; i <= 50; i++) {
+              for (let i = 1; i <= 100; i++) {
                 const qText = acfData[`q${i}_question`] || acfData[`q${i}_question_text`];
                 if (qText) {
                   extractedQuestions.push({

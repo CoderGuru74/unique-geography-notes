@@ -27,16 +27,16 @@ const TEST_SERIES_PLANS = {
     id: "paper_1_plan",
     name: "Paper 1 CBT Test Series Plan",
     price: 599,
-    tag: "Paper 1 Access",
-    desc: "Complete access to Paper 1 Common General Mock Tests & Answer Keys",
+    tag: "Paper 1 Access (3 Months)",
+    desc: "Complete 3-month access to Paper 1 Common General Mock Tests & Answer Keys",
     featured: true,
   },
   PAPER_2: {
     id: "paper_2_plan",
     name: "Paper 2 CBT Test Series Plan",
     price: 599,
-    tag: "Paper 2 Access",
-    desc: "Complete access to Paper 2 Geography Specialist Mock Tests & Solutions",
+    tag: "Paper 2 Access (3 Months)",
+    desc: "Complete 3-month access to Paper 2 Geography Specialist Mock Tests & Solutions",
     featured: true,
   },
 };
@@ -114,7 +114,6 @@ export default function AuthModal({
     activePlans.find((p) => p.id === selectedPlan) || activePlans[0];
 
   const handleSuccessAction = async () => {
-    // 1. If unlocking a CBT Test Series, redirect directly to the live test page
     if (isTestSeries || paperType === "PAPER_1" || paperType === "PAPER_2") {
       onClose();
       if (postId) {
@@ -136,7 +135,6 @@ export default function AuthModal({
       return;
     }
 
-    // 2. Otherwise execute standard PDF download
     await triggerPdfDownload();
   };
 
@@ -242,17 +240,35 @@ export default function AuthModal({
     }
   };
 
+  // Helper to check active access with 3-month expiration evaluation
   const hasAccess = () => {
     if (!user) return false;
 
+    const now = new Date();
+
     if (paperType === "PAPER_1") {
-      return Boolean(user.purchased_paper1);
-    }
-    if (paperType === "PAPER_2") {
-      return Boolean(user.purchased_paper2);
+      if (!user.purchased_paper1) return false;
+      if (user.paper1_expires_at) {
+        return now < new Date(user.paper1_expires_at);
+      }
+      return true;
     }
 
-    if (user.has_active_pass) return true;
+    if (paperType === "PAPER_2") {
+      if (!user.purchased_paper2) return false;
+      if (user.paper2_expires_at) {
+        return now < new Date(user.paper2_expires_at);
+      }
+      return true;
+    }
+
+    if (user.has_active_pass) {
+      if (user.pass_expires_at) {
+        return now < new Date(user.pass_expires_at);
+      }
+      return true;
+    }
+
     if (postId && Array.isArray(user.purchased_posts) && user.purchased_posts.includes(Number(postId))) {
       return true;
     }
@@ -290,16 +306,7 @@ export default function AuthModal({
       setUser(data.user);
       localStorage.setItem("notes_user", JSON.stringify(data.user));
 
-      let userHasAccess = false;
-      if (paperType === "PAPER_1") {
-        userHasAccess = Boolean(data.user.purchased_paper1);
-      } else if (paperType === "PAPER_2") {
-        userHasAccess = Boolean(data.user.purchased_paper2);
-      } else {
-        userHasAccess = data.user.has_active_pass || (postId && data.user.purchased_posts?.includes(Number(postId)));
-      }
-
-      if (userHasAccess) {
+      if (hasAccess()) {
         await handleSuccessAction();
       }
     } catch (err) {
@@ -356,7 +363,7 @@ export default function AuthModal({
         amount: currentPlanObj.price * 100,
         currency: "INR",
         name: "Unique Geography Notes",
-        description: `${currentPlanObj.name} (Access Pass)`,
+        description: `${currentPlanObj.name} (3 Months Access)`,
         prefill: {
           name: user?.name || "Student",
           email: user?.email || "student@gmail.com",
@@ -366,11 +373,26 @@ export default function AuthModal({
         },
         handler: async function (response) {
           try {
+            const now = new Date();
+            const expiry3Months = new Date();
+            expiry3Months.setMonth(expiry3Months.getMonth() + 3);
+
+            const expiry2Months = new Date();
+            expiry2Months.setMonth(expiry2Months.getMonth() + 2);
+
             const updatedUser = {
               ...user,
               has_active_pass: currentPlanObj.id === "all_access" ? true : user?.has_active_pass,
+              pass_expires_at: currentPlanObj.id === "all_access" ? expiry2Months.toISOString() : user?.pass_expires_at,
+              
               purchased_paper1: paperType === "PAPER_1" ? true : user?.purchased_paper1,
+              paper1_purchased_at: paperType === "PAPER_1" ? now.toISOString() : user?.paper1_purchased_at,
+              paper1_expires_at: paperType === "PAPER_1" ? expiry3Months.toISOString() : user?.paper1_expires_at,
+
               purchased_paper2: paperType === "PAPER_2" ? true : user?.purchased_paper2,
+              paper2_purchased_at: paperType === "PAPER_2" ? now.toISOString() : user?.paper2_purchased_at,
+              paper2_expires_at: paperType === "PAPER_2" ? expiry3Months.toISOString() : user?.paper2_expires_at,
+
               purchased_posts: postId
                 ? [...(user?.purchased_posts || []), Number(postId)]
                 : user?.purchased_posts,
@@ -401,6 +423,24 @@ export default function AuthModal({
   const handleLogout = () => {
     localStorage.removeItem("notes_user");
     setUser(null);
+  };
+
+  // Extract expiry text for UI badge if active
+  const getExpiryDateString = () => {
+    if (!user) return "";
+    let expiryStr = null;
+    if (paperType === "PAPER_1") expiryStr = user.paper1_expires_at;
+    if (paperType === "PAPER_2") expiryStr = user.paper2_expires_at;
+    if (!expiryStr && user.has_active_pass) expiryStr = user.pass_expires_at;
+
+    if (expiryStr) {
+      return new Date(expiryStr).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    }
+    return "";
   };
 
   return (
@@ -579,6 +619,11 @@ export default function AuthModal({
                   ? "Your test series plan is active! Click below to start your live test."
                   : "You have active access! Click below to download your complete paper."}
               </p>
+              {getExpiryDateString() && (
+                <div className="inline-block bg-blue-50 text-blue-800 text-[11px] font-bold px-3 py-1 rounded-full border border-blue-200">
+                  Plan valid until: {getExpiryDateString()}
+                </div>
+              )}
               <button
                 onClick={handleSuccessAction}
                 disabled={downloading}
@@ -666,7 +711,7 @@ export default function AuthModal({
 
               <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 pt-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Secured by Razorpay • Instant Unlock</span>
+                <span>Secured by Razorpay • 3 Months Validity</span>
               </div>
             </div>
           )}
