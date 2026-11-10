@@ -11,6 +11,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        {/* Google AdSense Script */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6720627503569332"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+
         {/* Anti-copy / anti-inspect protection */}
         <Script
           id="disable-inspect"
@@ -30,6 +38,7 @@ export default function RootLayout({ children }) {
             `,
           }}
         />
+
         {/* Razorpay Checkout SDK */}
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"
