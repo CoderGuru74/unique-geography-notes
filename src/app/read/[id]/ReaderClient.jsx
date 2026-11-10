@@ -436,10 +436,12 @@ export default function ReaderClient({ rawId }) {
             const extractedQuestions = [];
 
             if (acfData) {
+              // Loop strictly from 1 to 100 to guarantee question order 1, 2, 3...
               for (let i = 1; i <= 100; i++) {
                 const qText = acfData[`q${i}_question`] || acfData[`q${i}_question_text`];
                 if (qText) {
                   extractedQuestions.push({
+                    id: i,
                     question_text: qText,
                     option_a: acfData[`q${i}_option_a`] || "",
                     option_b: acfData[`q${i}_option_b`] || "",
@@ -537,7 +539,44 @@ export default function ReaderClient({ rawId }) {
   }
 
   const handleContentClick = (e) => {
-    const targetLink = e.target.closest("a, button");
+    const target = e.target;
+    if (!target) return;
+
+    // Handle WordPress Static "Show Answer" Toggle Buttons
+    const clickText = (target.innerText || "").trim().toLowerCase();
+    const isShowAnswerBtn =
+      clickText.includes("show answer") ||
+      clickText.includes("hide answer") ||
+      clickText.includes("उत्तर देखें") ||
+      clickText.includes("उत्तर छिपाएं") ||
+      target.classList.contains("show-answer") ||
+      target.classList.contains("toggle-answer");
+
+    if (isShowAnswerBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      let answerEl = target.nextElementSibling;
+      if (!answerEl && target.parentElement) {
+        answerEl = target.parentElement.querySelector(".answer, .solution, div[style*='display'], p[style*='display']") || 
+                   target.parentElement.nextElementSibling;
+      }
+
+      if (answerEl) {
+        const isHidden = window.getComputedStyle(answerEl).display === "none" || answerEl.classList.contains("hidden");
+        if (isHidden) {
+          answerEl.style.display = "block";
+          answerEl.classList.remove("hidden");
+          target.innerText = target.innerText.replace(/Show/i, "Hide").replace(/देखें/, "छिपाएं");
+        } else {
+          answerEl.style.display = "none";
+          target.innerText = target.innerText.replace(/Hide/i, "Show").replace(/छिपाएं/, "देखें");
+        }
+      }
+      return;
+    }
+
+    const targetLink = target.closest("a, button");
     if (!targetLink) return;
 
     const rawHref = targetLink.getAttribute("href") || "";
